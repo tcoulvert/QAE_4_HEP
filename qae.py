@@ -27,7 +27,10 @@ def main(ansatz, ansatz_save, params, events, train_size, n_ansatz_qubits,
     n_wires = n_ansatz_qubits + n_trash_qubits + 1
     swap_pattern = compute_swap_pattern(n_ansatz_qubits, n_latent_qubits, n_trash_qubits, n_wires)
     
-    dev = qml.device('qulacs.simulator', wires=n_wires, gpu=gpu, shots=n_shots) # big mems
+    # qml.about()
+
+    # dev = qml.device('qulacs.simulator', wires=n_wires, gpu=gpu, shots=n_shots) # big mems
+    dev = qml.device('default.qubit', wires=n_wires, shots=n_shots)
     # print(f'Mem qml device - {psutil.Process().memory_info().rss / (1024 * 1024)}')
     qnode = qml.QNode(circuit, dev, diff_method='best')
     
