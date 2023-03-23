@@ -41,7 +41,7 @@ def main(rng_seed):
 
 if __name__ == 'main':
     parser = argparse.ArgumentParser()
-    parser.add_argument("-s", "--seed", help="Random numner generator seed")
+    parser.add_argument("-s", "--seed", type=int, help="Random numner generator seed")
     args = parser.parse_args()
 
     main(args.seed)
