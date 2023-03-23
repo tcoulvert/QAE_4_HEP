@@ -18,7 +18,7 @@ from scipy import pi
 
 def main(ansatz, ansatz_save, params, events, train_size, n_ansatz_qubits, 
             n_latent_qubits, rng_seed, ix, gen, start_time, n_shots, gpu=False):
-    # os.environ["CUDA_VISIBLE_DEVICES"]=f"{(ix+2)%8}"
+    os.environ["CUDA_VISIBLE_DEVICES"]=f"{(ix+2)%8}"
     # time.sleep(ix)
     # with contextlib.redirect_stdout(None):
     #     exec('import setGPU') # big mems
@@ -29,8 +29,8 @@ def main(ansatz, ansatz_save, params, events, train_size, n_ansatz_qubits,
     
     # qml.about()
 
-    # dev = qml.device('qulacs.simulator', wires=n_wires, gpu=gpu, shots=n_shots) # big mems
-    dev = qml.device('default.qubit', wires=n_wires, shots=n_shots)
+    dev = qml.device('qulacs.simulator', wires=n_wires, gpu=gpu, shots=n_shots) # big mems
+    # dev = qml.device('default.qubit', wires=n_wires, shots=n_shots)
     # print(f'Mem qml device - {psutil.Process().memory_info().rss / (1024 * 1024)}')
     qnode = qml.QNode(circuit, dev, diff_method='best')
     
@@ -164,7 +164,7 @@ def train(events, config):
     plt.figure(config['train_size'])
     plt.style.use("seaborn")
     plt.plot(qng_cost, "g", label="QNG Descent - %d data" % config['train_size'])
-    plt.ylabel("Loss (-Fid.)")
+    plt.ylabel("Loss (-1 * Fid.)")
     plt.xlabel("Optimization steps")
     plt.legend()
     plt.savefig(filepath_curves)
