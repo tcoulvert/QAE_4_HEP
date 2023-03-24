@@ -16,9 +16,9 @@ from scipy import pi
 # from sklearn.preprocessing import MinMaxScaler
 
 
-def main(ansatz, ansatz_save, params, events, train_size, n_ansatz_qubits, 
+def main(ansatz, ansatz_save, params, events, train_size, batch_size, n_ansatz_qubits, 
             n_latent_qubits, rng_seed, ix, gen, start_time, n_shots, gpu=False):
-    os.environ["CUDA_VISIBLE_DEVICES"]=f"{(ix+2)%8}"
+    # os.environ["CUDA_VISIBLE_DEVICES"]=f"{(ix+2)%8}"
     # time.sleep(ix)
     # with contextlib.redirect_stdout(None):
     #     exec('import setGPU') # big mems
@@ -29,19 +29,22 @@ def main(ansatz, ansatz_save, params, events, train_size, n_ansatz_qubits,
     
     # qml.about()
 
-    dev = qml.device('qulacs.simulator', wires=n_wires, gpu=gpu, shots=n_shots) # big mems
-    # dev = qml.device('default.qubit', wires=n_wires, shots=n_shots)
+    # dev = qml.device('qulacs.simulator', wires=n_wires, gpu=gpu, shots=n_shots) # big mems
+    dev = qml.device('default.qubit', wires=n_wires, shots=n_shots)
     # print(f'Mem qml device - {psutil.Process().memory_info().rss / (1024 * 1024)}')
     qnode = qml.QNode(circuit, dev, diff_method='best')
     
-    if ix == 0:
-        print(ansatz_save)
+    # if ix == 0:
+    #     print(ansatz_save)
+    print(f'running circuit {ix}')
+    print(ansatz_save)
     config = {
         'qnode': qnode,
         'ansatz': ansatz,
         'ansatz_save': ansatz_save,
         'params': params,
         'train_size': train_size,
+        'batch_size': batch_size,
         'n_latent_qubits': n_latent_qubits,
         'n_trash_qubits': n_trash_qubits,
         'n_wires': n_wires,
@@ -86,6 +89,8 @@ def circuit(params, event=None, config=None):
     return qml.expval(qml.PauliZ(wires=config['n_wires']-1))
 
 def train(events, config):
+    if len(config['params']) == 0:
+        return np.array(-2)
     circuit = config['qnode']
     rng = np.random.default_rng(seed=config['rng_seed'])
     qng_cost = [1]
@@ -98,16 +103,19 @@ def train(events, config):
     step_size_factor = 0
     theta = pi * rng.random(size=np.shape(config['params']), requires_grad=True)
     step = 0
+
     while True:
-        grads = np.zeros((events.shape[0], theta.shape[0]))
-        costs = np.zeros(events.shape[0])
+        events_batch = rng.choice(events, config['batch_size'], replace=False)
+
+        grads = np.zeros((events_batch.shape[0], theta.shape[0]))
+        costs = np.zeros(events_batch.shape[0])
 
         # iterating over all the training data
-        for i in range(events.shape[0]):
-            fub_stud = qml.metric_tensor(config['qnode'], approx="block-diag")(theta, event=events[i], config=config)
-            grads[i] = np.matmul(fub_stud, opt.compute_grad(config['qnode'], (theta, events[i], config), {})[0][0])
-            costs[i] = circuit(theta, event=events[i], config=config)
-            
+        for i in range(events_batch.shape[0]):
+            fub_stud = qml.metric_tensor(config['qnode'], approx="block-diag")(theta, event=events_batch[i], config=config)
+            grads[i] = np.matmul(fub_stud, opt.compute_grad(config['qnode'], (theta, events_batch[i], config), {})[0][0])
+            costs[i] = circuit(theta, event=events_batch[i], config=config)
+
         if best_perf[0] > costs.mean(axis=0):
             best_perf[0] = costs.mean(axis=0)
             best_perf[1] = theta
@@ -153,7 +161,7 @@ def train(events, config):
     np.save(filepath_run, config['ansatz'])
     # Make ansatz to draw in output files
     filepath_draw = os.path.join(destdir_ansatz, '%02d_%03dga_best%.e_draw_ansatz' % (config['ix'], config['gen'], config['train_size']))
-    ansatz_draw = qml.draw(config['qnode'], decimals=None, expansion_strategy='device')(theta, event=events[0], config=config)
+    ansatz_draw = qml.draw(config['qnode'], decimals=None, expansion_strategy='device')(theta, event=events_batch[0], config=config)
     with open(filepath_draw, "w") as f:
         f.write(ansatz_draw)
         
@@ -174,7 +182,7 @@ def train(events, config):
     if config['ix'] == 0:
         print(f'Mem qml final - {psutil.Process().memory_info().rss / (1024 * 1024)}')
         
-    return -1 * best_perf[0]
+    return -1 * best_perf[0] # Returning Fid estimate
 
 # def compute_auroc(filepath_thetas, config):
 #     f_ix = filepath_thetas.find('qae_runs')
