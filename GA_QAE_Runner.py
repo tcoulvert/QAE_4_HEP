@@ -22,8 +22,8 @@ def main(rng_seed):
         "n_qubits": 3,
         "max_moments": 4,
         "add_moment_prob": 0.15,
-        "gates_arr": ["I", "RX", "RY", "RZ", "CNOT"],
-        "gates_probs": [0.175, 0.175, 0.175, 0.175, 0.3],
+        "gates_arr": ["I", "RX", "RY", "RZ", "PhaseShift", "CNOT"],
+        "gates_probs": [0.15, 0.15, 0.15, 0.15, 0.15, 0.25],
         "pop_size": 20,  # must be a multiple of max_concurrent
         "init_pop_size": 1000,
         "n_new_individuals": 10,
