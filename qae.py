@@ -27,8 +27,19 @@ def main(config):
         # with contextlib.redirect_stdout(None):
         #     exec('import setGPU') # big mems
         # print(f'Mem setGPU - {psutil.Process().memory_info().rss / (1024 * 1024)}')
-    # n_trash_qubits = n_ansatz_qubits - n_latent_qubits
-    # n_wires = n_ansatz_qubits + n_trash_qubits + 1
+
+        dev = qml.device(
+            "qulacs.simulator",
+            wires=config["n_wires"],
+            gpu=config["GPU"],
+            shots=config["n_shots"],
+        )  # big mems
+    else:
+        dev = qml.device("default.qubit", wires=config["n_wires"], shots=config["n_shots"])
+    
+    # print(f'Mem qml device - {psutil.Process().memory_info().rss / (1024 * 1024)}')
+    config["qnode"] = qml.QNode(circuit, dev, diff_method="best")
+    
     config["swap_pattern"] = compute_swap_pattern(
         config["n_ansatz_qubits"],
         config["n_latent_qubits"],
@@ -36,18 +47,6 @@ def main(config):
         config["n_wires"],
     )
 
-    dev = qml.device(
-        "qulacs.simulator",
-        wires=config["n_wires"],
-        gpu=config["GPU"],
-        shots=config["n_shots"],
-    )  # big mems
-    # dev = qml.device("default.qubit", wires=n_wires, shots=n_shots)
-    # print(f'Mem qml device - {psutil.Process().memory_info().rss / (1024 * 1024)}')
-    config["qnode"] = qml.QNode(circuit, dev, diff_method="best")
-
-    if config["ix"] == 0:
-        print(config["ansatz_save"])
     print(f"running circuit {config['ix']}")
     print(config["ansatz_dicts"])
 
@@ -118,16 +117,18 @@ def circuit(params, event=None, config=None):
 
 def train(config):
     if len(config["params"]) == 0:
-        return np.array(-2)
-    circuit = config["qnode"]
+        return {
+            "fitness_metric": -2,
+            "eval_metrics": {
+                "auroc": 0,
+            },
+        }
     rng = np.random.default_rng(seed=config["rng_seed"])
     qng_cost = []
     qng_auroc = []
     opt = qml.QNGOptimizer(1e-1, approx="block-diag")
 
     # Initialized to 2 b/c worst performance would be value of 1.
-    # best_perf = [2, np.array([]), 0] # change to dict
-    # stop_check = [[0, 0], [0, 0]] # change to dict
     best_perf = {
         "avg_loss": 2,
         "opt_params": np.array([]),
@@ -148,10 +149,9 @@ def train(config):
     while True:
         if step == rebatch_step:
             batched_events, rebatch_step = batch_events(
-                rng.permutation(config["events"]), config["batch_size"]
+                rng.permutation(config["events"]), config["batch_size"], rng
             )
 
-        # events_batch = rng.choice(config["events"], config["batch_size"], replace=False)
         events_batch = batched_events[step - rebatch_step]
 
         grads = np.zeros((events_batch.shape[0], theta.shape[0]))
@@ -168,12 +168,12 @@ def train(config):
                     0
                 ][0],
             )
-            costs[i] = circuit(theta, event=events_batch[i], config=config)
+            costs[i] = config["qnode"](theta, event=events_batch[i], config=config).item()
 
         if best_perf["avg_loss"] > costs.mean(axis=0):
             best_perf["avg_loss"] = costs.mean(axis=0)
             best_perf["opt_params"] = theta
-            best_perf["auroc"] = compute_auroc(theta, config)
+            # best_perf["auroc"] = compute_auroc(theta, config)
         theta = theta - (10**step_size_factor * np.sum(grads, axis=0))
         qng_cost.append(costs.mean(axis=0))
         qng_auroc.append(compute_auroc(theta, config))
@@ -248,7 +248,7 @@ def train(config):
         os.makedirs(destdir_curves)
     filepath_opt_loss = os.path.join(
         destdir_curves,
-        "%02d_%03dga_QNG_Descent-%d_data.pdf"
+        "%02d_%03dga_QNG_Descent-%d_data.png"
         % (config["ix"], config["gen"], config["batch_size"]),
     )
     plt.figure(0)
@@ -261,7 +261,7 @@ def train(config):
 
     filepath_opt_auroc = os.path.join(
         destdir_curves,
-        "%02d_%03dga_auroc_bb1-%d_data.pdf"
+        "%02d_%03dga_auroc_bb1-%d_data.png"
         % (config["ix"], config["gen"], config["batch_size"]),
     )
     plt.figure(1)
@@ -275,9 +275,10 @@ def train(config):
     auroc, bkg_rejec, tpr = compute_auroc(theta, config, FINAL=True)
     filepath_auroc = os.path.join(
         destdir_curves,
-        "%02d_%03dga_roc_bb1-%d_data.pdf"
+        "%02d_%03dga_roc_bb1-%d_data.png"
         % (config["ix"], config["gen"], config["batch_size"]),
     )
+    print(auroc)
     plt.figure(2)
     plt.style.use("seaborn")
     plt.plot(bkg_rejec, tpr, label=f"AUROC - {auroc}")
@@ -303,13 +304,13 @@ def train(config):
 def compute_auroc(theta, config, FINAL=False):
     cost = []
     for i in range(np.size(config["events_val"], axis=0)):
-        cost.append(circuit(theta, event=config["events_val"][i, :], config=config))
+        cost.append(config["qnode"](theta, event=config["events_val"][i, :], config=config).item())
 
-    cost = -1 * np.array(cost, requires_grad=False)
-    auroc = roc_auc_score(config["truth_val"], cost)
+    fid_pred = -1 * np.array(cost, requires_grad=False)
+    auroc = roc_auc_score(config["truth_val"], fid_pred)
 
     if FINAL:
-        fpr, tpr, thresholds = roc_curve(config["truth_val"], cost)
+        fpr, tpr, thresholds = roc_curve(config["truth_val"], fid_pred)
         bkg_rejec = 1 - fpr
         return auroc, bkg_rejec, tpr
 

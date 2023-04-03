@@ -32,8 +32,8 @@ def main(rng_seed):
     sig_event_ixs = np.nonzero(event_class, requires_grad=False)[0]
     bkg_event_ixs = np.where(event_class == 0)[0]
 
-    # rng = np.radnom.default_generator(rng_seed)
-    rng = np.radnom.default_generator(42)
+    # rng = np.random.default_rng(rng_seed)
+    rng = np.random.default_rng(42)
     chosen_bkg_event_ixs = rng.choice(
         bkg_event_ixs, 1000 - np.size(sig_event_ixs), replace=False
     )
@@ -55,10 +55,10 @@ def main(rng_seed):
         "gates_probs": [0.175, 0.175, 0.175, 0.175, 0.3],
         # "gates_arr": ["I", "RX", "RY", "RZ", "PhaseShift", "CNOT"],
         # "gates_probs": [0.15, 0.15, 0.15, 0.15, 0.15, 0.25],
-        "pop_size": 20,  # must be a multiple of max_concurrent
+        "pop_size": 4,  # must be a multiple of max_concurrent
         "init_pop_size": 1000,
-        "n_new_individuals": 10,
-        "n_winners": 10,  # needs to be an even number
+        "n_new_individuals": 2,
+        "n_winners": 2,  # needs to be an even number
         "n_mutations": 1,
         "n_mate_swaps": 1,
         "n_steps": 15,
@@ -68,9 +68,9 @@ def main(rng_seed):
             "n_wires": 6,  # allows us to use GA to optimize subsets of a circuit
             "n_trash_qubits": 2,
             "n_latent_qubits": 1,
-            "n_shots": 500,
+            "n_shots": 100,
             "events": events,
-            "batch_size": 32,
+            "batch_size": 8,
             "GPU": False,
             "events_val": chosen_val_events,
             "truth_val": chosen_val_class,
