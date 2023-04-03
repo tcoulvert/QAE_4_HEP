@@ -122,15 +122,15 @@ def train(config):
 
     # Initialized to 2 b/c worst performance would be value of 1.
     best_perf = {
-        "avg_loss": 2,
+        "avg_loss": 2.0,
         "opt_params": np.array([]),
-        "auroc": 0,
+        "auroc": 0.0,
     }
     stop_check = {
-        "old_avg": 0,
-        "old_std_dev": 0,
-        "new_avg": 0,
-        "new_std_dev": 0,
+        "old_avg": 0.0,
+        "old_std_dev": 0.0,
+        "new_avg": 0.0,
+        "new_std_dev": 0.0,
     }
     stop_check_factor = 40
     step_size_factor = 0
@@ -165,12 +165,14 @@ def train(config):
             ).item()
 
         if best_perf["avg_loss"] > costs.mean(axis=0):
-            best_perf["avg_loss"] = costs.mean(axis=0)
+            best_perf["avg_loss"] = costs.mean(axis=0).item()
             best_perf["opt_params"] = theta
-            # best_perf["auroc"] = compute_auroc(theta, config)
+            auroc = compute_auroc(theta, config)
+            best_perf["auroc"] = auroc
+            qng_auroc.append(auroc)
         theta = theta - (10**step_size_factor * np.sum(grads, axis=0))
         qng_cost.append(costs.mean(axis=0))
-        qng_auroc.append(compute_auroc(theta, config))
+        # qng_auroc.append(compute_auroc(theta, config))
 
         # checking the stopping condition
         if step > stop_check_factor:

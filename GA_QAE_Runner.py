@@ -18,7 +18,6 @@ def main(rng_seed):
     events = np.load("10k_dijet.npy", requires_grad=False)
     scaler = MinMaxScaler(feature_range=(0, sp.pi))
     events = scaler.fit_transform(events)
-    ### ---------------------------- ###
 
     ### Making the validation data ###
     events_bb1 = np.load("10k_dijet_bb1.npy", requires_grad=False)
@@ -42,7 +41,6 @@ def main(rng_seed):
 
     chosen_val_events = events_bb1[chosen_ixs, :]
     chosen_val_class = event_class[chosen_ixs]
-    ### ---------------------------- ###
 
     config = {
         "backend_type": "high",
