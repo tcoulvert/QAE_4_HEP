@@ -1,17 +1,9 @@
 # import contextlib
 import os
+import matplotlib.pyplot as plt
 
-# import time
+import pennylane as qml
 
-# import psutil
-
-# print(f'Mem initial - {psutil.Process().memory_info().rss / (1024 * 1024)}')
-import matplotlib.pyplot as plt  # big mems
-
-# print(f'Mem pyplot - {psutil.Process().memory_info().rss / (1024 * 1024)}')
-import pennylane as qml  # big mems
-
-# print(f'Mem pennylane - {psutil.Process().memory_info().rss / (1024 * 1024)}')
 from pennylane import numpy as np
 from pickle import dump
 from scipy import pi
@@ -25,21 +17,21 @@ def main(config):
         os.environ["CUDA_VISIBLE_DEVICES"] = f"{(config['ix']+2)%8}"
         # time.sleep(ix)
         # with contextlib.redirect_stdout(None):
-        #     exec('import setGPU') # big mems
-        # print(f'Mem setGPU - {psutil.Process().memory_info().rss / (1024 * 1024)}')
+        #     exec('import setGPU')
 
         dev = qml.device(
             "qulacs.simulator",
             wires=config["n_wires"],
             gpu=config["GPU"],
             shots=config["n_shots"],
-        )  # big mems
+        )
     else:
-        dev = qml.device("default.qubit", wires=config["n_wires"], shots=config["n_shots"])
-    
-    # print(f'Mem qml device - {psutil.Process().memory_info().rss / (1024 * 1024)}')
+        dev = qml.device(
+            "default.qubit", wires=config["n_wires"], shots=config["n_shots"]
+        )
+
     config["qnode"] = qml.QNode(circuit, dev, diff_method="best")
-    
+
     config["swap_pattern"] = compute_swap_pattern(
         config["n_ansatz_qubits"],
         config["n_latent_qubits"],
@@ -168,7 +160,9 @@ def train(config):
                     0
                 ][0],
             )
-            costs[i] = config["qnode"](theta, event=events_batch[i], config=config).item()
+            costs[i] = config["qnode"](
+                theta, event=events_batch[i], config=config
+            ).item()
 
         if best_perf["avg_loss"] > costs.mean(axis=0):
             best_perf["avg_loss"] = costs.mean(axis=0)
@@ -196,8 +190,6 @@ def train(config):
 
         step += 1
 
-    # big mems
-    # print(f'Mem done training - {psutil.Process().memory_info().rss / (1024 * 1024)}')
     script_path = os.path.dirname(os.path.realpath(__file__))
     destdir = os.path.join(script_path, "qae_runs_%s" % config["start_time"])
     if not os.path.exists(destdir):
@@ -278,7 +270,6 @@ def train(config):
         "%02d_%03dga_roc_bb1-%d_data.png"
         % (config["ix"], config["gen"], config["batch_size"]),
     )
-    print(auroc)
     plt.figure(2)
     plt.style.use("seaborn")
     plt.plot(bkg_rejec, tpr, label=f"AUROC - {auroc}")
@@ -287,11 +278,6 @@ def train(config):
     plt.ylabel("Sig.  Acceptance")
     plt.legend()
     plt.savefig(filepath_auroc, format="png")
-
-    # big mems
-    # print(f'Mem saved files - {psutil.Process().memory_info().rss / (1024 * 1024)}')
-    # if config["ix"] == 0:
-    # print(f"Mem qml final - {psutil.Process().memory_info().rss / (1024 * 1024)}")
 
     return {
         "fitness_metric": -1 * best_perf["avg_loss"],
@@ -304,10 +290,14 @@ def train(config):
 def compute_auroc(theta, config, FINAL=False):
     cost = []
     for i in range(np.size(config["events_val"], axis=0)):
-        cost.append(config["qnode"](theta, event=config["events_val"][i, :], config=config).item())
+        cost.append(
+            config["qnode"](
+                theta, event=config["events_val"][i, :], config=config
+            ).item()
+        )
 
     fid_pred = -1 * np.array(cost, requires_grad=False)
-    auroc = roc_auc_score(config["truth_val"], fid_pred)
+    auroc = roc_auc_score(config["truth_val"], fid_pred).item()
 
     if FINAL:
         fpr, tpr, thresholds = roc_curve(config["truth_val"], fid_pred)

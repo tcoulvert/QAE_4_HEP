@@ -49,28 +49,28 @@ def main(rng_seed):
         "vqc": qae_main,  # main func that handles variational quantum circuit training
         "max_concurrent": 2,
         "n_qubits": 3,
-        "max_moments": 4,
+        "max_moments": 2,  # >= 1
         "add_moment_prob": 0.15,
         "gates_arr": ["I", "RX", "RY", "RZ", "CNOT"],
         "gates_probs": [0.175, 0.175, 0.175, 0.175, 0.3],
         # "gates_arr": ["I", "RX", "RY", "RZ", "PhaseShift", "CNOT"],
         # "gates_probs": [0.15, 0.15, 0.15, 0.15, 0.15, 0.25],
         "pop_size": 4,  # must be a multiple of max_concurrent
-        "init_pop_size": 1000,
-        "n_new_individuals": 2,
+        "init_pop_size": 10,
+        "n_new_individuals": 2,  # >= 0
         "n_winners": 2,  # needs to be an even number
         "n_mutations": 1,
         "n_mate_swaps": 1,
-        "n_steps": 15,
+        "n_steps_patience": 15,
         "rng_seed": rng_seed,
         "ga_output_path": os.path.dirname(os.path.realpath(__file__)),
         "vqc_config": {
             "n_wires": 6,  # allows us to use GA to optimize subsets of a circuit
             "n_trash_qubits": 2,
             "n_latent_qubits": 1,
-            "n_shots": 100,
+            "n_shots": 100,  # ~1000
             "events": events,
-            "batch_size": 8,
+            "batch_size": 8,  # powers of 2, between 1 to 32
             "GPU": False,
             "events_val": chosen_val_events,
             "truth_val": chosen_val_class,
