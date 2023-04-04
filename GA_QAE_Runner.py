@@ -48,7 +48,7 @@ def main(rng_seed):
         "max_concurrent": 2,
         "n_qubits": 3,
         "max_moments": 2,  # >= 1
-        "add_moment_prob": 0.15,
+        "add_moment_prob": 0.0, #0.15
         "gates_arr": ["I", "RX", "RY", "RZ", "CNOT"],
         "gates_probs": [0.175, 0.175, 0.175, 0.175, 0.3],
         # "gates_arr": ["I", "RX", "RY", "RZ", "PhaseShift", "CNOT"],
@@ -66,7 +66,7 @@ def main(rng_seed):
             "n_wires": 6,  # allows us to use GA to optimize subsets of a circuit
             "n_trash_qubits": 2,
             "n_latent_qubits": 1,
-            "n_shots": 100,  # ~1000
+            "n_shots": 10,  # ~1000
             "events": events,
             "batch_size": 8,  # powers of 2, between 1 to 32
             "GPU": False,

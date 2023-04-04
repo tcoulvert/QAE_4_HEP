@@ -167,9 +167,10 @@ def train(config):
         if best_perf["avg_loss"] > costs.mean(axis=0):
             best_perf["avg_loss"] = costs.mean(axis=0).item()
             best_perf["opt_params"] = theta
-            auroc = compute_auroc(theta, config)
-            best_perf["auroc"] = auroc
-            qng_auroc.append(auroc)
+            # best_perf["auroc"] = compute_auroc(theta, config)
+            # auroc = compute_auroc(theta, config)
+            # best_perf["auroc"] = auroc
+            # qng_auroc.append(auroc)
         theta = theta - (10**step_size_factor * np.sum(grads, axis=0))
         qng_cost.append(costs.mean(axis=0))
         # qng_auroc.append(compute_auroc(theta, config))
