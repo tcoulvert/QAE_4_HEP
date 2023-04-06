@@ -101,24 +101,22 @@ def circuit(params, event=None, config=None):
     qml.Hadamard(wires=config["n_wires"] - 1)
 
     # Puts |1> state as the "state of same fidelities", because expval(PauliZ(|1>)) < 0 => gradient descent
-    qml.PauliX(wires=config["n_wires"] - 1)
+    # qml.PauliX(wires=config["n_wires"] - 1)
 
     # qml.operation.Tensor(qml.PauliZ...) for measuring multiple anscillary wires
     return qml.expval(qml.PauliZ(wires=config["n_wires"] - 1))
 
+def loss(cost):
+    return (1 - cost)**2
+
+def grad_loss(circuit_grad, cost):
+    return -2 * (1 - cost) * circuit_grad
 
 def train(config):
-    if len(config["params"]) == 0:
-        return {
-            "fitness_metric": -2,
-            "eval_metrics": {
-                "auroc": 0,
-            },
-        }
     rng = np.random.default_rng(seed=config["rng_seed"])
     qng_cost = []
     qng_auroc = []
-    opt = qml.QNGOptimizer(1e-1, approx="block-diag")
+    opt = qml.QNGOptimizer(1e0, approx="block-diag")
 
     # Initialized to 2 b/c worst performance would be value of 1.
     best_perf = {
@@ -133,7 +131,7 @@ def train(config):
         "new_std_dev": 0.0,
     }
     stop_check_factor = 40
-    step_size_factor = 0
+    step_size_factor = -4
     theta = pi * rng.random(size=np.shape(config["params"]), requires_grad=True)
     step = 0
     rebatch_step = 0
@@ -160,20 +158,21 @@ def train(config):
                     0
                 ][0],
             )
-            costs[i] = config["qnode"](
-                theta, event=events_batch[i], config=config
-            ).item()
+            costs[i] = loss(
+                config["qnode"](
+                    theta, event=events_batch[i], config=config
+                ).item()
+            )
+            grads[i] = grad_loss(grads[i], costs[i])
 
         if best_perf["avg_loss"] > costs.mean(axis=0):
             best_perf["avg_loss"] = costs.mean(axis=0).item()
             best_perf["opt_params"] = theta
-            # best_perf["auroc"] = compute_auroc(theta, config)
-            # auroc = compute_auroc(theta, config)
-            # best_perf["auroc"] = auroc
-            # qng_auroc.append(auroc)
+            auroc = compute_auroc(theta, config)
+            best_perf["auroc"] = auroc
+            qng_auroc.append(auroc)
         theta = theta - (10**step_size_factor * np.sum(grads, axis=0))
         qng_cost.append(costs.mean(axis=0))
-        # qng_auroc.append(compute_auroc(theta, config))
 
         # checking the stopping condition
         if step > stop_check_factor:
@@ -188,11 +187,12 @@ def train(config):
             ):
                 step_size_factor -= 1
                 stop_check_factor = step + 20
-                if step_size_factor < -7:
+                if step_size_factor < -8:
                     break
 
         step += 1
 
+    # Saving outputs
     script_path = os.path.dirname(os.path.realpath(__file__))
     destdir = os.path.join(script_path, "qae_runs_%s" % config["start_time"])
     if not os.path.exists(destdir):
@@ -261,9 +261,9 @@ def train(config):
     )
     plt.figure(1)
     plt.style.use("seaborn")
-    plt.plot(qng_auroc, "g", label="QNG Descent - %d data" % config["batch_size"])
+    plt.plot(qng_auroc, "g", label="AUROC - %d data" % config["batch_size"])
     plt.ylabel("AUROC")
-    plt.xlabel("Optimization steps")
+    plt.xlabel("Permofrmance improved steps")
     plt.legend()
     plt.savefig(filepath_opt_auroc, format="png")
 
@@ -277,13 +277,16 @@ def train(config):
     plt.style.use("seaborn")
     plt.plot(bkg_rejec, tpr, label=f"AUROC - {auroc}")
     plt.title("ROC on BB1 w/ GA Ansatz")
-    plt.xlabel("Bkg. Rejection")
-    plt.ylabel("Sig.  Acceptance")
+    # plt.xlabel("Bkg. Rejection")
+    # plt.ylabel("Sig.  Acceptance")
+    plt.xlabel("False Positive Rate")
+    plt.ylabel("True Positive Rate")
     plt.legend()
     plt.savefig(filepath_auroc, format="png")
 
     return {
-        "fitness_metric": -1 * best_perf["avg_loss"],
+        # "fitness_metric": 1 - best_perf["avg_loss"]**0.5,
+        "fitness_metric": 1 - best_perf["avg_loss"],
         "eval_metrics": {
             "auroc": best_perf["auroc"],
         },
@@ -291,20 +294,23 @@ def train(config):
 
 
 def compute_auroc(theta, config, FINAL=False):
-    cost = []
+    costs = []
     for i in range(np.size(config["events_val"], axis=0)):
-        cost.append(
-            config["qnode"](
-                theta, event=config["events_val"][i, :], config=config
-            ).item()
+        costs.append(
+            loss(
+                config["qnode"](
+                    theta, event=config["events_val"][i, :], config=config
+                ).item()
+            )
         )
 
-    fid_pred = -1 * np.array(cost, requires_grad=False)
+    # fid_pred = 1 - np.power(costs, 0.5, requires_grad=False)
+    fid_pred = 1 - np.array(costs, requires_grad=False)
     auroc = roc_auc_score(config["truth_val"], fid_pred).item()
 
     if FINAL:
         fpr, tpr, thresholds = roc_curve(config["truth_val"], fid_pred)
-        bkg_rejec = 1 - fpr
-        return auroc, bkg_rejec, tpr
+        # bkg_rejec = 1 - fpr
+        return auroc, fpr, tpr
 
     return auroc
