@@ -100,9 +100,6 @@ def circuit(params, event=None, config=None):
     )
     qml.Hadamard(wires=config["n_wires"] - 1)
 
-    # Puts |1> state as the "state of same fidelities", because expval(PauliZ(|1>)) < 0 => gradient descent
-    # qml.PauliX(wires=config["n_wires"] - 1)
-
     # qml.operation.Tensor(qml.PauliZ...) for measuring multiple anscillary wires
     return qml.expval(qml.PauliZ(wires=config["n_wires"] - 1))
 
@@ -131,8 +128,8 @@ def train(config):
         "new_std_dev": 0.0,
     }
     stop_check_factor = 40
-    step_size_factor = -4
-    theta = pi * rng.random(size=np.shape(config["params"]), requires_grad=True)
+    step_size_factor = -1
+    theta = pi * rng.random(size=config["n_params"], requires_grad=True)
     step = 0
     rebatch_step = 0
 
@@ -277,15 +274,12 @@ def train(config):
     plt.style.use("seaborn")
     plt.plot(bkg_rejec, tpr, label=f"AUROC - {auroc}")
     plt.title("ROC on BB1 w/ GA Ansatz")
-    # plt.xlabel("Bkg. Rejection")
-    # plt.ylabel("Sig.  Acceptance")
-    plt.xlabel("False Positive Rate")
-    plt.ylabel("True Positive Rate")
+    plt.xlabel("Bkg. Rejection")
+    plt.ylabel("Sig.  Acceptance")
     plt.legend()
     plt.savefig(filepath_auroc, format="png")
 
     return {
-        # "fitness_metric": 1 - best_perf["avg_loss"]**0.5,
         "fitness_metric": 1 - best_perf["avg_loss"],
         "eval_metrics": {
             "auroc": best_perf["auroc"],
@@ -304,13 +298,13 @@ def compute_auroc(theta, config, FINAL=False):
             )
         )
 
-    # fid_pred = 1 - np.power(costs, 0.5, requires_grad=False)
-    fid_pred = 1 - np.array(costs, requires_grad=False)
+    # Don't do "1 - ..." b/c 0 is bkg and 1 is sig
+    fid_pred = np.array(costs, requires_grad=False)
     auroc = roc_auc_score(config["truth_val"], fid_pred).item()
 
     if FINAL:
         fpr, tpr, thresholds = roc_curve(config["truth_val"], fid_pred)
-        # bkg_rejec = 1 - fpr
-        return auroc, fpr, tpr
+        bkg_rejec = 1 - fpr
+        return auroc, bkg_rejec, tpr
 
     return auroc
