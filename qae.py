@@ -246,7 +246,7 @@ def train(config):
     plt.figure(0)
     plt.style.use("seaborn")
     plt.plot(qng_cost, "g", label="QNG Descent - %d data" % config["batch_size"])
-    plt.ylabel("Loss (-1 * Fid.)")
+    plt.ylabel("Loss (1 - Fid.)")
     plt.xlabel("Optimization steps")
     plt.legend()
     plt.savefig(filepath_opt_loss, format="png")

@@ -58,7 +58,7 @@ def main(rng_seed):
         "max_concurrent": 2,
         "n_qubits": 3,
         # "n_init_moments": 2,
-        "max_moments": 2,  # >= 1
+        "max_moments": 6,  # >= 1
         "add_moment_prob": 0.0,
         "genepool": genepool,
         "pop_size": 4,  # must be a multiple of max_concurrent
