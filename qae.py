@@ -1,4 +1,5 @@
 # import contextlib
+import copy
 import os
 import matplotlib.pyplot as plt
 
@@ -103,22 +104,29 @@ def circuit(params, event=None, config=None):
     # qml.operation.Tensor(qml.PauliZ...) for measuring multiple anscillary wires
     return qml.expval(qml.PauliZ(wires=config["n_wires"] - 1))
 
-def loss(cost):
-    return (1 - cost)**2
+def square_loss(fidelities):
+    loss = (1 - fidelities)**2
+    
+    return loss
 
-def grad_loss(circuit_grad, cost):
-    return -2 * (1 - cost) * circuit_grad
+def cost(params, event, config):
+    fidelities = config["qnode"](params, event=event, config=config)
+    
+    return square_loss(fidelities)
 
 def train(config):
     rng = np.random.default_rng(seed=config["rng_seed"])
-    qng_cost = []
-    qng_auroc = []
-    opt = qml.QNGOptimizer(1e0, approx="block-diag")
+    # qng_cost = []
+    # qng_auroc = []
+    # opt = qml.QNGOptimizer(1e0, approx="block-diag")
+    adm_cost = []
+    adm_auroc = []
+    opt = qml.AdamOptimizer(0.01, beta1=0.9, beta2=0.999)
 
     # Initialized to 2 b/c worst performance would be value of 1.
     best_perf = {
         "avg_loss": 2.0,
-        "opt_params": np.array([]),
+        "opt_params": None,
         "auroc": 0.0,
     }
     stop_check = {
@@ -129,7 +137,7 @@ def train(config):
     }
     stop_check_factor = 40
     step_size_factor = -1
-    theta = pi * rng.random(size=config["n_params"], requires_grad=True)
+    thetas = config["params"]
     step = 0
     rebatch_step = 0
 
@@ -140,43 +148,60 @@ def train(config):
             )
 
         events_batch = batched_events[step - rebatch_step]
-
-        grads = np.zeros((events_batch.shape[0], theta.shape[0]))
-        costs = np.zeros(events_batch.shape[0])
+        # grads = np.array(
+        #     [copy.deepcopy(thetas) for _ in range(config["batch_size"])]
+        # )
+        # costs = np.zeros(events_batch.shape[0])
+        grads = []
+        costs = []
 
         # iterating over all the training data
         for i in range(events_batch.shape[0]):
-            fub_stud = qml.metric_tensor(config["qnode"], approx="block-diag")(
-                theta, event=events_batch[i], config=config
-            )
-            grads[i] = np.matmul(
-                fub_stud,
-                opt.compute_grad(config["qnode"], (theta, events_batch[i], config), {})[
-                    0
-                ][0],
-            )
-            costs[i] = loss(
-                config["qnode"](
-                    theta, event=events_batch[i], config=config
-                ).item()
-            )
-            grads[i] = grad_loss(grads[i], costs[i])
+            # fub_stud = qml.metric_tensor(config["qnode"], approx="block-diag")(
+            #     thetas, event=events_batch[i], config=config
+            # )
 
-        if best_perf["avg_loss"] > costs.mean(axis=0):
-            best_perf["avg_loss"] = costs.mean(axis=0).item()
-            best_perf["opt_params"] = theta
-            auroc = compute_auroc(theta, config)
+            # print(fub_stud)
+            # output = opt.compute_grad(config["qnode"], (thetas, events_batch[i], config), {})
+            # print(output)
+            # print(output[0])
+            # print(output[0][0])
+            # print(np.shape(fub_stud))
+            # print('where error')
+            # print(np.shape(output))
+            # grads[i] = np.matmul(
+            #     fub_stud,
+            #     opt.compute_grad(config["qnode"], (thetas, events_batch[i], config), {})[0][0],
+            # )
+            # costs[i] = loss(
+            #     config["qnode"](
+            #         thetas, event=events_batch[i], config=config
+            #     ).item()
+            # )
+            # grads[i] = grad_loss(grads[i], costs[i])
+            # (grad_i, _), cost_i = opt.compute_grad(cost, (thetas, events_batch[i], config), {})
+            #   -> why doesn't this work?
+            (grad_i, _), cost_i = opt.compute_grad(cost, (thetas, events_batch[i], config), {})
+            grads.append(grad_i)
+            costs.append(cost_i.item())
+
+        if best_perf["avg_loss"] > np.mean(costs, axis=0):
+            best_perf["avg_loss"] = np.mean(costs, axis=0).item()
+            best_perf["opt_params"] = thetas
+            auroc = compute_auroc(thetas, config)
             best_perf["auroc"] = auroc
-            qng_auroc.append(auroc)
-        theta = theta - (10**step_size_factor * np.sum(grads, axis=0))
-        qng_cost.append(costs.mean(axis=0))
+            adm_auroc.append(auroc)
+        else:
+            adm_auroc.append(adm_auroc[-1])
+        thetas = thetas - (10**step_size_factor * np.sum(grads, axis=0))
+        adm_cost.append(np.mean(costs, axis=0))
 
         # checking the stopping condition
         if step > stop_check_factor:
-            stop_check["old_avg"] = np.mean(qng_cost[-40:-20], axis=0)
-            stop_check["old_std_dev"] = np.std(qng_cost[-40:-20], axis=0)
-            stop_check["new_avg"] = np.mean(qng_cost[-20:], axis=0)
-            stop_check["new_std_dev"] = np.std(qng_cost[-20:], axis=0)
+            stop_check["old_avg"] = np.mean(adm_cost[-40:-20], axis=0)
+            stop_check["old_std_dev"] = np.std(adm_cost[-40:-20], axis=0)
+            stop_check["new_avg"] = np.mean(adm_cost[-20:], axis=0)
+            stop_check["new_std_dev"] = np.std(adm_cost[-20:], axis=0)
             if np.isclose(
                 stop_check["old_avg"],
                 stop_check["new_avg"],
@@ -230,7 +255,7 @@ def train(config):
         % (config["ix"], config["gen"], config["batch_size"]),
     )
     ansatz_draw = qml.draw(config["qnode"], decimals=None, expansion_strategy="device")(
-        theta, event=events_batch[0], config=config
+        thetas, event=events_batch[0], config=config
     )
     with open(filepath_draw, "w") as f:
         f.write(ansatz_draw)
@@ -245,7 +270,7 @@ def train(config):
     )
     plt.figure(0)
     plt.style.use("seaborn")
-    plt.plot(qng_cost, "g", label="QNG Descent - %d data" % config["batch_size"])
+    plt.plot(adm_cost, "g", label="QNG Descent - %d data" % config["batch_size"])
     plt.ylabel("Loss (1 - Fid.)")
     plt.xlabel("Optimization steps")
     plt.legend()
@@ -258,13 +283,13 @@ def train(config):
     )
     plt.figure(1)
     plt.style.use("seaborn")
-    plt.plot(qng_auroc, "g", label="AUROC - %d data" % config["batch_size"])
+    plt.plot(adm_auroc, "g", label="AUROC - %d data" % config["batch_size"])
     plt.ylabel("AUROC")
-    plt.xlabel("Permofrmance improved steps")
+    plt.xlabel("Optimization steps")
     plt.legend()
     plt.savefig(filepath_opt_auroc, format="png")
 
-    auroc, bkg_rejec, tpr = compute_auroc(theta, config, FINAL=True)
+    auroc, bkg_rejec, tpr = compute_auroc(thetas, config, FINAL=True)
     filepath_auroc = os.path.join(
         destdir_curves,
         "%02d_%03dga_roc_bb1-%d_data.png"
@@ -287,18 +312,14 @@ def train(config):
     }
 
 
-def compute_auroc(theta, config, FINAL=False):
+def compute_auroc(thetas, config, FINAL=False):
     costs = []
     for i in range(np.size(config["events_val"], axis=0)):
         costs.append(
-            loss(
-                config["qnode"](
-                    theta, event=config["events_val"][i, :], config=config
-                ).item()
-            )
+            cost(thetas, config["events_val"][i], config).item()
         )
 
-    # Don't do "1 - ..." b/c 0 is bkg and 1 is sig
+    # Don't do "1 - np.array(...)" b/c 0 is bkg and 1 is sig
     fid_pred = np.array(costs, requires_grad=False)
     auroc = roc_auc_score(config["truth_val"], fid_pred).item()
 

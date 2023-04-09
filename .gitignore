@@ -2,3 +2,4 @@ qae_runs*
 *.pyc
 .DS_Store
 ga_runs/*
+ga_curves/*

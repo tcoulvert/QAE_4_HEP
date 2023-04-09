@@ -46,6 +46,7 @@ def main(rng_seed):
     # gates_dict = {"I": (1, 0), "RX": (1, 1), "RY": (1, 1), "RZ": (1, 1), "CNOT": (2, 0)}
     # gates_dict = {"I": (1, 0), "RX": (1, 1), "RY": (1, 1), "RZ": (1, 1), "PhaseShift": (1, 1), "CNOT": (2, 0)}
     gates_dict = {"I": (1, 0), "U3": (1, 3), "CNOT": (2, 0)}
+    # gates_dict = {"I": (1, 0), "RX": (1, 1), "CNOT": (2, 0)}
     # gates_probs = [0.175, 0.175, 0.175, 0.175, 0.3]
     # gates_probs = [0.15, 0.15, 0.15, 0.15, 0.15, 0.25]
     gates_probs = [0.15, 0.6, 0.25]
@@ -58,7 +59,7 @@ def main(rng_seed):
         "max_concurrent": 2,
         "n_qubits": 3,
         # "n_init_moments": 2,
-        "max_moments": 6,  # >= 1
+        "max_moments": 2,  # >= 1
         "add_moment_prob": 0.0,
         "genepool": genepool,
         "pop_size": 4,  # must be a multiple of max_concurrent
