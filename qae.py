@@ -231,12 +231,12 @@ def train(config):
         os.makedirs(destdir_curves)
     filepath_opt_loss = os.path.join(
         destdir_curves,
-        "%02d_%03dga_QNG_Descent-%d_data.png"
+        "%02d_%03dga_ADAM_Descent-%d_data.png"
         % (config["ix"], config["gen"], config["batch_size"]),
     )
     plt.figure(0)
     plt.style.use("seaborn")
-    plt.plot(adm_cost, "g", label="QNG Descent - %d data" % config["batch_size"])
+    plt.plot(adm_cost, "g", label="ADAM Descent - %d data" % config["batch_size"])
     plt.ylabel("Loss (1 - Fid.)")
     plt.xlabel("Optimization steps")
     plt.legend()
