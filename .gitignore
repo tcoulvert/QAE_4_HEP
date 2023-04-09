@@ -1,6 +1,6 @@
 qae_runs*
 *.pyc
 .DS_Store
-ga_runs/*
-ga_curves/*
+ga_runs*
+ga_curves*
 *best*

@@ -182,7 +182,7 @@ def train(config):
 
     # Saving outputs
     script_path = os.path.dirname(os.path.realpath(__file__))
-    destdir = os.path.join(script_path, "qae_runs", "qae_runs_%s" % config["start_time"])
+    destdir = os.path.join(script_path, "qae_runs", "run-%s" % config["start_time"])
     if not os.path.exists(destdir):
         os.makedirs(destdir)
 
