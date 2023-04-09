@@ -1,5 +1,4 @@
 # import contextlib
-import copy
 import os
 import matplotlib.pyplot as plt
 
@@ -7,10 +6,8 @@ import pennylane as qml
 
 from pennylane import numpy as np
 from pickle import dump
-from scipy import pi
 
 from sklearn.metrics import roc_auc_score, roc_curve
-from sklearn.preprocessing import MinMaxScaler
 
 
 def main(config):
@@ -116,9 +113,6 @@ def cost(params, event, config):
 
 def train(config):
     rng = np.random.default_rng(seed=config["rng_seed"])
-    # qng_cost = []
-    # qng_auroc = []
-    # opt = qml.QNGOptimizer(1e0, approx="block-diag")
     adm_cost = []
     adm_auroc = []
     opt = qml.AdamOptimizer(0.01, beta1=0.9, beta2=0.999)
@@ -148,39 +142,11 @@ def train(config):
             )
 
         events_batch = batched_events[step - rebatch_step]
-        # grads = np.array(
-        #     [copy.deepcopy(thetas) for _ in range(config["batch_size"])]
-        # )
-        # costs = np.zeros(events_batch.shape[0])
         grads = []
         costs = []
 
         # iterating over all the training data
         for i in range(events_batch.shape[0]):
-            # fub_stud = qml.metric_tensor(config["qnode"], approx="block-diag")(
-            #     thetas, event=events_batch[i], config=config
-            # )
-
-            # print(fub_stud)
-            # output = opt.compute_grad(config["qnode"], (thetas, events_batch[i], config), {})
-            # print(output)
-            # print(output[0])
-            # print(output[0][0])
-            # print(np.shape(fub_stud))
-            # print('where error')
-            # print(np.shape(output))
-            # grads[i] = np.matmul(
-            #     fub_stud,
-            #     opt.compute_grad(config["qnode"], (thetas, events_batch[i], config), {})[0][0],
-            # )
-            # costs[i] = loss(
-            #     config["qnode"](
-            #         thetas, event=events_batch[i], config=config
-            #     ).item()
-            # )
-            # grads[i] = grad_loss(grads[i], costs[i])
-            # (grad_i, _), cost_i = opt.compute_grad(cost, (thetas, events_batch[i], config), {})
-            #   -> why doesn't this work?
             (grad_i, _), cost_i = opt.compute_grad(cost, (thetas, events_batch[i], config), {})
             grads.append(grad_i)
             costs.append(cost_i.item())
@@ -216,7 +182,7 @@ def train(config):
 
     # Saving outputs
     script_path = os.path.dirname(os.path.realpath(__file__))
-    destdir = os.path.join(script_path, "qae_runs_%s" % config["start_time"])
+    destdir = os.path.join(script_path, "qae_runs", "qae_runs_%s" % config["start_time"])
     if not os.path.exists(destdir):
         os.makedirs(destdir)
 
@@ -275,6 +241,7 @@ def train(config):
     plt.xlabel("Optimization steps")
     plt.legend()
     plt.savefig(filepath_opt_loss, format="png")
+    plt.close(0)
 
     filepath_opt_auroc = os.path.join(
         destdir_curves,
@@ -288,6 +255,7 @@ def train(config):
     plt.xlabel("Optimization steps")
     plt.legend()
     plt.savefig(filepath_opt_auroc, format="png")
+    plt.close(1)
 
     auroc, bkg_rejec, tpr = compute_auroc(thetas, config, FINAL=True)
     filepath_auroc = os.path.join(
@@ -303,6 +271,7 @@ def train(config):
     plt.ylabel("Sig.  Acceptance")
     plt.legend()
     plt.savefig(filepath_auroc, format="png")
+    plt.close(2)
 
     return {
         "fitness_metric": 1 - best_perf["avg_loss"],
