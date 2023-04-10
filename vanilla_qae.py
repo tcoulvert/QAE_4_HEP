@@ -8,7 +8,7 @@ from .qae import main
 
 ### Making the training data ###
 events = np.load("10k_dijet.npy", requires_grad=False)
-scaler = MinMaxScaler(feature_range=(0, sp.pi))
+scaler = MinMaxScaler(feature_range=(0, np.pi))
 events = scaler.fit_transform(events)
 
 ### Making the validation data ###
