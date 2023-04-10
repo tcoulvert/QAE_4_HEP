@@ -14,9 +14,11 @@ best_ansatz = gav.Individual(dict_arr[-1]["best_ansatz"])
 
 full_pop_ansatz = []
 full_pop_auroc = []
+full_pop_fitness = []
 for results_dict in dict_arr:
     ansatz_dicts = results_dict["full_population"]
     eval_dicts = results_dict["full_eval_metrics"]
+    full_pop_fitness.extend(results_dict["full_fitness"])
     for ansatz_dict in ansatz_dicts:   
         full_pop_ansatz.append(gav.Individual(ansatz_dict=ansatz_dict))
     for eval_dict in eval_dicts:
@@ -49,8 +51,10 @@ filepath_euclid = os.path.join(
 )
 plt.figure(0)
 plt.style.use("seaborn")
-plt.scatter(distances_from_best, full_pop_auroc, marker=".", color="g")
-plt.ylabel("AUROC")
+plt.scatter(distances_from_best, full_pop_fitness, marker=".", c=full_pop_auroc, cmap=plt.set_cmap('plasma'))
+cbar = plt.colorbar()
+cbar.set_label("AUROC")
+plt.ylabel("Fitness")
 plt.xlabel("Euclidian distance from best ansatz")
 plt.title("Euclidean Distances from Best Performing Ansatz")
 plt.savefig(filepath_euclid, format="png")
