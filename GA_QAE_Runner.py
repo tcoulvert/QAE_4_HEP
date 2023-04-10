@@ -31,8 +31,7 @@ def main(rng_seed):
     sig_event_ixs = np.nonzero(event_class, requires_grad=False)[0]
     bkg_event_ixs = np.where(event_class == 0)[0]
 
-    # rng = np.random.default_rng(rng_seed)
-    rng = np.random.default_rng(42)
+    rng = np.random.default_rng(rng_seed)
     chosen_bkg_event_ixs = rng.choice(
         bkg_event_ixs, 1000 - np.size(sig_event_ixs), replace=False
     )

@@ -6,7 +6,7 @@ import numpy as np
 import json
 
 dict_arr = []
-for filename in os.listdir('/Users/tsievert/GA Caltech/QAE_4_HEP/ga_runs/run-2023-04-09_01-12-46'):
+for filename in os.listdir(''):
    with open(os.path.join(os.getcwd(), filename), 'r') as f: # open in readonly mode
         dict_arr.append(json.load(f))
 
@@ -18,7 +18,7 @@ for results_dict in dict_arr:
     ansatz_dicts = results_dict["full_population"]
     eval_dicts = results_dict["full_eval_metrics"]
     for ansatz_dict in ansatz_dicts:   
-        full_pop_ansatz.append(gav.Individual(ansatz=ansatz_dict))
+        full_pop_ansatz.append(gav.Individual(ansatz_dict=ansatz_dict))
     for eval_dict in eval_dicts:
         full_pop_auroc.append(eval_dict["auroc"])
 
