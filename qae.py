@@ -162,11 +162,13 @@ def train(config):
         adm_cost.append(np.mean(costs, axis=0))
 
         # checking the stopping condition
-        if (step - best_perf["update_step"]) > stop_check_factor:
-                step_size_factor -= 1
-                stop_check_factor += stop_check_factor
-                if step_size_factor < -8:
-                    break
+        # if (step - best_perf["update_step"]) > stop_check_factor:
+        #     step_size_factor -= 1
+        #     stop_check_factor += stop_check_factor
+        #     if step_size_factor < -8:
+        #         break
+        if step == 20:
+            break
 
         step += 1
 
