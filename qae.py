@@ -1,4 +1,5 @@
 # import contextlib
+import copy
 import os
 import matplotlib.pyplot as plt
 
@@ -122,11 +123,12 @@ def train(config):
         "avg_loss": 2.0,
         "opt_params": None,
         "auroc": 0.0,
-        "update_step": 0,
+        # "update_step": 0,
     }
-    stop_check_factor = 5
+    # stop_check_factor = 5
     step_size_factor = -1
     thetas = config["params"]
+    thetas_arr = []
     step = 0
     rebatch_step = 0
 
@@ -146,29 +148,40 @@ def train(config):
             grads.append(grad_i)
             costs.append(cost_i.item())
 
-        if best_perf["avg_loss"] > np.mean(costs, axis=0):
-            best_perf["update_step"] = step
-            stop_check_factor = 5
-            best_perf["avg_loss"] = np.mean(costs, axis=0).item()
-            best_perf["opt_params"] = thetas
-            auroc = compute_auroc(thetas, config)
-            best_perf["auroc"] = auroc
-            adm_auroc.append(auroc)
-        else:
-            auroc = compute_auroc(thetas, config)
-            adm_auroc.append(auroc)
-            # adm_auroc.append(adm_auroc[-1])
+        # if best_perf["avg_loss"] > np.mean(costs, axis=0):
+        #     best_perf["update_step"] = step
+        #     stop_check_factor = 5
+        #     best_perf["avg_loss"] = np.mean(costs, axis=0).item()
+        #     best_perf["opt_params"] = thetas
+        #     auroc = compute_auroc(thetas, config)
+        #     best_perf["auroc"] = auroc
+        #     adm_auroc.append(auroc)
+        # else:
+        #     auroc = compute_auroc(thetas, config)
+        #     adm_auroc.append(auroc)
+        #     # adm_auroc.append(adm_auroc[-1])
+        adm_auroc.append(compute_auroc(thetas, config))
+        thetas_arr.append(copy.deepcopy(thetas))
         thetas = thetas - (10**step_size_factor * np.sum(grads, axis=0))
         adm_cost.append(np.mean(costs, axis=0))
 
         # checking the stopping condition
+        if step < 6:
+            continue
+        
+        if np.abs(np.sum(np.array(adm_cost[-5:]) - np.array(adm_cost[-6:-1]))) < 0.1:
+            best_perf["opt_params"] = thetas_arr[-6]
+            best_perf["avg_loss"] = adm_cost[-6]
+            best_perf["auroc"] = adm_auroc[-6]
+            break
+        
         # if (step - best_perf["update_step"]) > stop_check_factor:
         #     step_size_factor -= 1
         #     stop_check_factor += stop_check_factor
         #     if step_size_factor < -8:
         #         break
-        if step == 20:
-            break
+        # if step == 20:
+        #     break
 
         step += 1
 
