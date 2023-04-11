@@ -122,14 +122,9 @@ def train(config):
         "avg_loss": 2.0,
         "opt_params": None,
         "auroc": 0.0,
+        "update_step": 0,
     }
-    stop_check = {
-        "old_avg": 0.0,
-        "old_std_dev": 0.0,
-        "new_avg": 0.0,
-        "new_std_dev": 0.0,
-    }
-    stop_check_factor = 40
+    stop_check_factor = 5
     step_size_factor = -1
     thetas = config["params"]
     step = 0
@@ -152,29 +147,24 @@ def train(config):
             costs.append(cost_i.item())
 
         if best_perf["avg_loss"] > np.mean(costs, axis=0):
+            best_perf["update_step"] = step
+            stop_check_factor = 5
             best_perf["avg_loss"] = np.mean(costs, axis=0).item()
             best_perf["opt_params"] = thetas
             auroc = compute_auroc(thetas, config)
             best_perf["auroc"] = auroc
             adm_auroc.append(auroc)
         else:
-            adm_auroc.append(adm_auroc[-1])
+            auroc = compute_auroc(thetas, config)
+            adm_auroc.append(auroc)
+            # adm_auroc.append(adm_auroc[-1])
         thetas = thetas - (10**step_size_factor * np.sum(grads, axis=0))
         adm_cost.append(np.mean(costs, axis=0))
 
         # checking the stopping condition
-        if step > stop_check_factor:
-            stop_check["old_avg"] = np.mean(adm_cost[-40:-20], axis=0)
-            stop_check["old_std_dev"] = np.std(adm_cost[-40:-20], axis=0)
-            stop_check["new_avg"] = np.mean(adm_cost[-20:], axis=0)
-            stop_check["new_std_dev"] = np.std(adm_cost[-20:], axis=0)
-            if np.isclose(
-                stop_check["old_avg"],
-                stop_check["new_avg"],
-                atol=np.amax([stop_check["old_std_dev"], stop_check["new_std_dev"]]),
-            ):
+        if (step - best_perf["update_step"]) > stop_check_factor:
                 step_size_factor -= 1
-                stop_check_factor = step + 20
+                stop_check_factor += stop_check_factor
                 if step_size_factor < -8:
                     break
 
@@ -250,7 +240,7 @@ def train(config):
     )
     plt.figure(1)
     plt.style.use("seaborn")
-    plt.plot(adm_auroc, "g", label="AUROC - %d data" % config["batch_size"])
+    plt.plot(adm_auroc, "b", label="AUROC - %d data" % config["batch_size"])
     plt.ylabel("AUROC")
     plt.xlabel("Optimization steps")
     plt.legend()
@@ -272,6 +262,22 @@ def train(config):
     plt.legend()
     plt.savefig(filepath_auroc, format="png")
     plt.close(2)
+
+    filepath_combine = os.path.join(
+        destdir_curves,
+        "%02d_%03dga_combine-%d_data.png"
+        % (config["ix"], config["gen"], config["batch_size"]),
+    )
+    fig, ax1 = plt.subplots()
+    plt.style.use("seaborn-v0_8-dark")
+    ax2 = ax1.twinx()
+    ax1.plot(adm_cost, "g", label="ADAM Descent - %d data" % config["batch_size"])
+    ax2.plot(adm_auroc, "b", label="AUROC - %d data" % config["batch_size"])
+    ax1.set_xlabel('Optimization steps', color = 'k')
+    ax1.set_ylabel('Loss (1 - Fid.)', color = 'g')
+    ax2.set_ylabel('AUROC', color = 'b')
+    plt.savefig(filepath_combine, format="png")
+    plt.close()
 
     return {
         "fitness_metric": 1 - best_perf["avg_loss"],

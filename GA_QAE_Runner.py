@@ -15,16 +15,16 @@ from qae import main as qae_main
 
 def main(rng_seed):
     ### Making the training data ###
-    events = np.load("10k_dijet.npy", requires_grad=False)
+    events = np.load("./Data/10k_dijet.npy", requires_grad=False)
     scaler = MinMaxScaler(feature_range=(0, sp.pi))
     events = scaler.fit_transform(events)
 
     ### Making the validation data ###
-    events_bb1 = np.load("10k_dijet_bb1.npy", requires_grad=False)
+    events_bb1 = np.load("./Data/10k_dijet_bb1.npy", requires_grad=False)
     events_bb1 = scaler.fit_transform(events_bb1)
 
-    classes = np.load("10k_dijet_bb1_class.npy", requires_grad=False)
-    f = open("events_LHCO2020_BlackBox1.masterkey", "r")
+    classes = np.load("./Data/10k_dijet_bb1_class.npy", requires_grad=False)
+    f = open("./Data/events_LHCO2020_BlackBox1.masterkey", "r")
     event_classes = np.genfromtxt(f, delimiter=",")
     event_class = event_classes[classes.tolist()]
 
@@ -61,8 +61,8 @@ def main(rng_seed):
         "max_moments": 2,  # >= 1
         "add_moment_prob": 0.0,
         "genepool": genepool,
-        "pop_size": 4,  # must be a multiple of max_concurrent
-        "init_pop_size": 10,
+        "pop_size": 10,  # must be a multiple of max_concurrent
+        "init_pop_size": 100,
         "n_new_individuals": 2,  # >= 0
         "n_winners": 2,  # needs to be an even number
         "n_mutations": 1,
