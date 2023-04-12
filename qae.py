@@ -123,9 +123,7 @@ def train(config):
         "avg_loss": 2.0,
         "opt_params": None,
         "auroc": 0.0,
-        # "update_step": 0,
     }
-    # stop_check_factor = 5
     step_size_factor = -1
     thetas = config["params"]
     thetas_arr = []
@@ -148,42 +146,23 @@ def train(config):
             grads.append(grad_i)
             costs.append(cost_i.item())
 
-        # if best_perf["avg_loss"] > np.mean(costs, axis=0):
-        #     best_perf["update_step"] = step
-        #     stop_check_factor = 5
-        #     best_perf["avg_loss"] = np.mean(costs, axis=0).item()
-        #     best_perf["opt_params"] = thetas
-        #     auroc = compute_auroc(thetas, config)
-        #     best_perf["auroc"] = auroc
-        #     adm_auroc.append(auroc)
-        # else:
-        #     auroc = compute_auroc(thetas, config)
-        #     adm_auroc.append(auroc)
-        #     # adm_auroc.append(adm_auroc[-1])
         adm_auroc.append(compute_auroc(thetas, config))
         thetas_arr.append(copy.deepcopy(thetas))
         thetas = thetas - (10**step_size_factor * np.sum(grads, axis=0))
         adm_cost.append(np.mean(costs, axis=0))
+        
+        step += 1
 
         # checking the stopping condition
         if step < 6:
             continue
         
-        if np.abs(np.sum(np.array(adm_cost[-5:]) - np.array(adm_cost[-6:-1]))) < 0.1:
+        if np.abs(adm_cost[-6] - adm_cost[-1]) < 0.1:
             best_perf["opt_params"] = thetas_arr[-6]
             best_perf["avg_loss"] = adm_cost[-6]
             best_perf["auroc"] = adm_auroc[-6]
             break
-        
-        # if (step - best_perf["update_step"]) > stop_check_factor:
-        #     step_size_factor -= 1
-        #     stop_check_factor += stop_check_factor
-        #     if step_size_factor < -8:
-        #         break
-        # if step == 20:
-        #     break
 
-        step += 1
 
     # Saving outputs
     script_path = os.path.dirname(os.path.realpath(__file__))
@@ -316,6 +295,54 @@ def compute_auroc(thetas, config, FINAL=False):
     if FINAL:
         fpr, tpr, thresholds = roc_curve(config["truth_val"], fid_pred)
         bkg_rejec = 1 - fpr
+
+        fid_split = [None, None]
+        bkg_cost, sig_cost = [], []
+
+        for i in range(np.size(config["truth_val"], axis=0)):
+            if config["truth_val"][i] == 0:
+                bkg_cost.append(fid_pred[i])
+            elif config["truth_val"][i] == 1:
+                sig_cost.append(fid_pred[i])
+
+        color_arr = ['r', 'b']
+        for i in range(2):
+            if i == 0:
+                label_str = 'bkg'
+                fid_split[i] = np.array(bkg_cost)
+                n_bins = 100
+            elif i == 1:
+                label_str = 'sig'
+                fid_split[i] = np.array(sig_cost)
+                n_bins = 10
+            
+            plt.figure(4)
+            plt.hist(fid_split[i], bins=n_bins, density=True, 
+                color=color_arr[i], alpha=0.5, linewidth=1.7,
+                label=label_str
+            )
+            plt.legend(loc='upper left')
+            plt.title('Fidelities on BB1')
+            plt.style.use("seaborn")
+            plt.xlabel('Fid.')
+            plt.ylabel('a.u')
+            
+        ### Saving outputs ###
+        script_path = os.path.dirname(os.path.realpath(__file__))
+        destdir = os.path.join(script_path, "qae_runs", "run-%s" % config["start_time"])
+        if not os.path.exists(destdir):
+            os.makedirs(destdir)
+        destdir_curves = os.path.join(destdir, "qml_curves")
+        if not os.path.exists(destdir_curves):
+            os.makedirs(destdir_curves)
+        filepath_hist = os.path.join(
+            destdir_curves,
+            "%02d_%03dsplit_fid_hist_bb1-%d.png"
+            % (config["ix"], config["gen"], config["batch_size"])
+        )
+        plt.savefig(filepath_hist, format='png')
+        plt.close(4)
+
         return auroc, bkg_rejec, tpr
 
     return auroc

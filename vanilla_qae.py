@@ -7,16 +7,16 @@ from sklearn.preprocessing import MinMaxScaler
 from qae import main
 
 ### Making the training data ###
-events = np.load("10k_dijet.npy", requires_grad=False)
+events = np.load("./Data/10k_dijet.npy", requires_grad=False)
 scaler = MinMaxScaler(feature_range=(0, np.pi))
 events = scaler.fit_transform(events)
 
 ### Making the validation data ###
-events_bb1 = np.load("10k_dijet_bb1.npy", requires_grad=False)
+events_bb1 = np.load("./Data/10k_dijet_bb1.npy", requires_grad=False)
 events_bb1 = scaler.fit_transform(events_bb1)
 
-classes = np.load("10k_dijet_bb1_class.npy", requires_grad=False)
-f = open("events_LHCO2020_BlackBox1.masterkey", "r")
+classes = np.load("./Data/10k_dijet_bb1_class.npy", requires_grad=False)
+f = open("./Data/events_LHCO2020_BlackBox1.masterkey", "r")
 event_classes = np.genfromtxt(f, delimiter=",")
 event_class = event_classes[classes.tolist()]
 
