@@ -241,7 +241,7 @@ def train(config):
     plt.savefig(filepath_opt_auroc, format="png")
     plt.close(1)
 
-    auroc, bkg_rejec, tpr = compute_auroc(thetas, config, FINAL=True)
+    auroc, bkg_rejec, tpr = compute_auroc(best_perf["opt_params"], config, FINAL=True)
     filepath_auroc = os.path.join(
         destdir_curves,
         "%02d_%03dga_roc_bb1-%d_data.png"
