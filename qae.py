@@ -1,10 +1,10 @@
-# import contextlib
+import contextlib
 import copy
 import os
+import time
 import matplotlib.pyplot as plt
 
 import pennylane as qml
-
 from pennylane import numpy as np
 from pickle import dump
 
@@ -13,10 +13,9 @@ from sklearn.metrics import roc_auc_score, roc_curve
 
 def main(config):
     if config["GPU"]:
-        os.environ["CUDA_VISIBLE_DEVICES"] = f"{(config['ix']+2)%8}"
-        # time.sleep(ix)
-        # with contextlib.redirect_stdout(None):
-        #     exec('import setGPU')
+        time.sleep(config['ix'])
+        with contextlib.redirect_stdout(None):
+            exec('import setGPU')
 
         dev = qml.device(
             "qulacs.simulator",
