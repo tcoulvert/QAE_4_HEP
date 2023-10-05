@@ -14,17 +14,18 @@ from qae import main as qae_main
 
 
 def main(rng_seed):
+    dir_path = os.path.dirname(os.path.abspath(__file__))
     ### Making the training data ###
-    events = np.load("./Data/10k_dijet.npy", requires_grad=False)
+    events = np.load(os.path.join(dir_path, "Data/10k_dijet.npy"), requires_grad=False)
     scaler = MinMaxScaler(feature_range=(0, sp.pi))
     events = scaler.fit_transform(events)
 
     ### Making the validation data ###
-    events_bb1 = np.load("./Data/10k_dijet_bb1.npy", requires_grad=False)
+    events_bb1 = np.load(os.path.join(dir_path, "Data/10k_dijet_bb1.npy"), requires_grad=False)
     events_bb1 = scaler.fit_transform(events_bb1)
 
-    classes = np.load("./Data/10k_dijet_bb1_class.npy", requires_grad=False)
-    f = open("./Data/events_LHCO2020_BlackBox1.masterkey", "r")
+    classes = np.load(os.path.join(dir_path, "Data/10k_dijet_bb1_class.npy"), requires_grad=False)
+    f = open(os.path.join(dir_path, "Data/events_LHCO2020_BlackBox1.masterkey"), "r")
     event_classes = np.genfromtxt(f, delimiter=",")
     event_class = event_classes[classes.tolist()]
 
@@ -50,7 +51,7 @@ def main(rng_seed):
         "n_wires": 6,  # allows us to use GA to optimize subsets of a circuit
         "n_trash_qubits": 2,
         "n_latent_qubits": 1,
-        "n_shots": 100,  # ~1000
+        "n_shots": 1000,  # ~1000
         "events": events,
         "batch_size": 8,  # powers of 2, between 1 to 32
         "GPU": False,
@@ -62,6 +63,9 @@ def main(rng_seed):
     ga_output_path = os.path.dirname(os.path.realpath(__file__))
 
     config = gav.Config(qae_main, vqc_config, genepool, ga_output_path)
+    config.init_pop_size = 1000
+    config.pop_size = 20
+
     ga = gav.setup(config)
     ga.evolve()
 
