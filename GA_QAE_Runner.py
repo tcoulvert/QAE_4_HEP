@@ -63,7 +63,7 @@ def main(rng_seed):
     ga_output_path = os.path.dirname(os.path.realpath(__file__))
 
     config = gav.Config(qae_main, vqc_config, genepool, ga_output_path)
-    config.init_pop_size = 100
+    config.init_pop_size = 1000
     config.pop_size = 10
     config.max_moments = 4
 
@@ -72,7 +72,7 @@ def main(rng_seed):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser() 
     parser.add_argument("-s", "--seed", type=int, help="Random numner generator seed")
     args = parser.parse_args()
 

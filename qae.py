@@ -38,7 +38,10 @@ def main(config):
     )
 
     print(f"running circuit {config['ix']}")
-    print(config["ansatz_dicts"])
+    # print(config["ansatz_dicts"])
+    print(config["ansatz_draw"])
+    # print(config["ansatz_qml"])
+    print('\n\n')
 
     best_fid = train(config)
     return best_fid
@@ -153,13 +156,13 @@ def train(config):
         step += 1
 
         # checking the stopping condition
-        if step < 6:
+        if step < 3:
             continue
         
-        if np.abs(adm_cost[-6] - adm_cost[-1]) < 0.1:
-            best_perf["opt_params"] = thetas_arr[-6]
-            best_perf["avg_loss"] = adm_cost[-6]
-            best_perf["auroc"] = adm_auroc[-6]
+        if np.abs(adm_cost[-3] - adm_cost[-1]) < 0.04:
+            best_perf["opt_params"] = thetas_arr[-3]
+            best_perf["avg_loss"] = adm_cost[-3]
+            best_perf["auroc"] = adm_auroc[-3]
             break
 
 
