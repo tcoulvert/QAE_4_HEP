@@ -66,6 +66,7 @@ def main(rng_seed):
     config.init_pop_size = 1000
     config.pop_size = 10
     config.max_moments = 4
+    config.n_steps_patience = 5
 
     ga = gav.setup(config)
     ga.evolve()
