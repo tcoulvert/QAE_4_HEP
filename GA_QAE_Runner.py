@@ -51,7 +51,7 @@ def main(rng_seed):
         "n_wires": 6,  # allows us to use GA to optimize subsets of a circuit
         "n_trash_qubits": 2,
         "n_latent_qubits": 1,
-        "n_shots": 100,  # ~1000
+        "n_shots": 1000,  # ~1000
         "events": events,
         "batch_size": 8,  # powers of 2, between 1 to 32
         "GPU": False,
@@ -64,7 +64,7 @@ def main(rng_seed):
 
     config = gav.Config(qae_main, vqc_config, genepool, ga_output_path)
     config.init_pop_size = 1000
-    config.pop_size = 10
+    config.pop_size = 20
     config.max_moments = 4
     config.n_steps_patience = 5
     config.n_eval_metrics = 1
