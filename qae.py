@@ -11,7 +11,7 @@ from pickle import dump
 from sklearn.metrics import roc_auc_score, roc_curve
 
 
-def main(config):
+def main(config) -> {"fitness_metric": int, "eval_metrics": {}}:
     if config["GPU"]:
         time.sleep(config['ix'])
         with contextlib.redirect_stdout(None):
@@ -38,13 +38,10 @@ def main(config):
     )
 
     print(f"running circuit {config['ix']}")
-    # print(config["ansatz_dicts"])
-    print(config["ansatz_draw"])
-    # print(config["ansatz_qml"])
-    print('\n\n')
+    print(config["ansatz_draw"] + '\n\n')
 
-    best_fid = train(config)
-    return best_fid
+    vqc_output = train(config)
+    return vqc_output
 
 
 def compute_swap_pattern(n_ansatz_qubits, n_latent_qubits, n_trash_qubits, n_wires):

@@ -67,14 +67,15 @@ def main(rng_seed):
     config.pop_size = 10
     config.max_moments = 4
     config.n_steps_patience = 5
+    config.n_eval_metrics = 1
 
     ga = gav.setup(config)
     ga.evolve()
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser() 
-    parser.add_argument("-s", "--seed", type=int, help="Random numner generator seed")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-s", "--seed", type=int, help="Random number generator seed")
     args = parser.parse_args()
 
     main(args.seed)
