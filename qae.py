@@ -38,7 +38,7 @@ def main(config) -> {"fitness_metric": int, "eval_metrics": {}}:
     )
 
     print(f"running circuit {config['ix']}")
-    print(config["ansatz_draw"] + '\n\n')
+    print(config["diagram"] + '\n\n')
 
     vqc_output = train(config)
     return vqc_output
@@ -87,7 +87,7 @@ def circuit(params, event=None, config=None):
     qml.Hadamard(wires=config["n_wires"] - 1)
 
     # Run the actual circuit ansatz
-    for m in config["ansatz_qml"]:
+    for m in config["qml"]:
         exec(m)
 
     # Perform the SWAP-Test for a qubit fidelity measurement
@@ -189,25 +189,22 @@ def train(config):
         % (config["ix"], config["gen"], config["batch_size"]),
     )
     with open(filepath_ansatz, "wb") as f:
-        dump(config["ansatz_dicts"], f)
+        dump(config["dicts"], f)
     # Make ansatz to run using loop
     filepath_run = os.path.join(
         destdir_ansatz,
         "%02d_%03dga_best%.e_run_ansatz"
         % (config["ix"], config["gen"], config["batch_size"]),
     )
-    np.save(filepath_run, config["ansatz_qml"])
+    np.save(filepath_run, config["qml"])
     # Make ansatz to draw in output files
     filepath_draw = os.path.join(
         destdir_ansatz,
         "%02d_%03dga_best%.e_draw_ansatz"
         % (config["ix"], config["gen"], config["batch_size"]),
     )
-    ansatz_draw = qml.draw(config["qnode"], decimals=None, expansion_strategy="device")(
-        thetas, event=events_batch[0], config=config
-    )
     with open(filepath_draw, "w") as f:
-        f.write(ansatz_draw)
+        f.write(config["diagram"])
 
     destdir_curves = os.path.join(destdir, "qml_curves")
     if not os.path.exists(destdir_curves):

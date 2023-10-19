@@ -61,8 +61,12 @@ def main(rng_seed):
     }
 
     ga_output_path = os.path.dirname(os.path.realpath(__file__))
+    baseline_circuit_data = {
+        "fitness_metric": 0,
+        "eval_metrics": {"auroc": 0}
+    }
 
-    config = gav.Config(qae_main, vqc_config, genepool, ga_output_path)
+    config = gav.Config(qae_main, vqc_config, genepool, ga_output_path, baseline_circuit_data)
     config.init_pop_size = 1000
     config.pop_size = 20
     config.max_moments = 4
