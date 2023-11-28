@@ -103,7 +103,7 @@ def main(rng_seed):
 
     ga_output_path = os.path.dirname(os.path.realpath(__file__))
     baseline_circuit_data = {
-        "fitness_metric": 0,
+        "fitness_metrics": 0,
         "eval_metrics": {"auroc": 0}
     }
 

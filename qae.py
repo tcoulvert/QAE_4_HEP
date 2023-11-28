@@ -112,6 +112,14 @@ def cost(params, event, config):
     return square_loss(fidelities)
 
 def train(config):
+    def find_best_index(cost_arr):
+        index = 0
+        for i in range(len(cost_arr)):
+            if np.std(cost_arr[i:i+5]) < 0.05:
+                index = i
+                break
+        return index
+    
     rng = np.random.default_rng(seed=config["rng_seed"])
     best_perfs = []
     for _ in range(20):
@@ -171,14 +179,6 @@ def train(config):
 
                 best_perfs.append(copy.deepcopy(best_perf))
                 break
-
-    def find_best_index(cost_arr):
-        index = 0
-        for i in range(len(cost_arr)):
-            if np.std(cost_arr[i:i+5]) < 0.05:
-                index = i
-                break
-        return index
 
 
 
