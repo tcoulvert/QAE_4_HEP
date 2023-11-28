@@ -1,6 +1,8 @@
 #! usr/bin/env python3
 
 import argparse
+import copy
+import math
 import os
 
 import scipy as sp
@@ -11,6 +13,45 @@ from sklearn.preprocessing import MinMaxScaler
 
 import ga_vqc as gav
 from qae import main as qae_main
+    
+def compare_fitness(fitness_A, fitness_B):
+    if fitness_A["avg fitness"] > fitness_B["avg fitness"]:
+        return 1
+    else:
+        return 0
+
+def choose_best(best_arr, fitness_arr):
+    return_best_ix_set = set([i for i in best_arr])
+    return_fitness_ix_set = set()
+    for i in range(len(fitness_arr)):
+        add_flag = True
+        for j in range(len(best_arr)):
+            if not math.isclose(best_arr[j]["avg fitness"], fitness_arr[i]["avg fitness"], 
+                    rel_tol=(best_arr[j]["stddev fitness"] + 
+                    fitness_arr[i]["stddev fitness"])):
+                
+                if fitness_arr[i]["avg fitness"] > best_arr[j]["avg fitness"]:
+                    return_best_ix_set.remove(j)
+                    return_fitness_ix_set.add(i)
+                else:
+                    add_flag = False
+                    break
+        for j in list(return_fitness_ix_set):
+            if not math.isclose(fitness_arr[j]["avg fitness"], fitness_arr[i]["avg fitness"], 
+                    rel_tol=(fitness_arr[j]["stddev fitness"] + 
+                    fitness_arr[i]["stddev fitness"])):
+                
+                if fitness_arr[i]["avg fitness"] > fitness_arr[j]["avg fitness"]:
+                    return_fitness_ix_set.remove(j)
+                    return_fitness_ix_set.add(i)
+                else:
+                    add_flag = False
+                    break
+        
+        if add_flag:
+            return_fitness_ix_set.add(i)
+
+    return return_best_ix_set, return_fitness_ix_set
 
 
 def main(rng_seed):
@@ -71,7 +112,10 @@ def main(rng_seed):
     config.pop_size = 4
     config.max_moments = 4
     config.n_steps_patience = 4
-    config.n_eval_metrics = 1
+    config.n_eval_metrics = 2
+    config.n_fitness_metrics = 2
+    config.compare_fitness = compare_fitness
+    config.choose_best = choose_best
 
     ga = gav.setup(config)
     ga.evolve()

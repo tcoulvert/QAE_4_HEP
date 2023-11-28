@@ -113,54 +113,74 @@ def cost(params, event, config):
 
 def train(config):
     rng = np.random.default_rng(seed=config["rng_seed"])
-    adm_cost = []
-    adm_auroc = []
-    opt = qml.AdamOptimizer(0.01, beta1=0.9, beta2=0.999)
+    best_perfs = []
+    for _ in range(20):
+        adm_cost = []
+        adm_auroc = []
+        opt = qml.AdamOptimizer(0.01, beta1=0.9, beta2=0.999)
 
-    # Initialized to 2 b/c worst performance would be value of 1.
-    best_perf = {
-        "avg_loss": 2.0,
-        "opt_params": None,
-        "auroc": 0.0,
-    }
-    step_size_factor = -1
-    thetas = config["params"]
-    thetas_arr = []
-    step = 0
-    rebatch_step = 0
+        # Initialized to 2 b/c worst performance would be value of 1.
+        best_perf = {
+            "avg_loss": 2.0,
+            "opt_params": None,
+            "auroc": 0.0,
+        }
+        step_size_factor = -1
+        thetas = config["params"]
+        thetas_arr = []
+        step = 0
+        rebatch_step = 0
 
-    while True:
-        if step == rebatch_step:
-            batched_events, rebatch_step = batch_events(
-                rng.permutation(config["events"]), config["batch_size"], rng
-            )
+        while True:
+            if step == rebatch_step:
+                batched_events, rebatch_step = batch_events(
+                    rng.permutation(config["events"]), config["batch_size"], rng
+                )
 
-        events_batch = batched_events[step - rebatch_step]
-        grads = []
-        costs = []
+            events_batch = batched_events[step - rebatch_step]
+            grads = []
+            costs = []
 
-        # iterating over all the training data
-        for i in range(events_batch.shape[0]):
-            (grad_i, _), cost_i = opt.compute_grad(cost, (thetas, events_batch[i], config), {})
-            grads.append(grad_i)
-            costs.append(cost_i.item())
+            # iterating over all the training data
+            for i in range(events_batch.shape[0]):
+                (grad_i, _), cost_i = opt.compute_grad(cost, (thetas, events_batch[i], config), {})
+                grads.append(grad_i)
+                costs.append(cost_i.item())
 
-        adm_auroc.append(compute_auroc(thetas, config))
-        thetas_arr.append(copy.deepcopy(thetas))
-        thetas = thetas - (10**step_size_factor * np.sum(grads, axis=0))
-        adm_cost.append(np.mean(costs, axis=0))
-        
-        step += 1
+            adm_auroc.append(compute_auroc(thetas, config))
+            thetas_arr.append(copy.deepcopy(thetas))
+            thetas = thetas - (10**step_size_factor * np.sum(grads, axis=0))
+            adm_cost.append(np.mean(costs, axis=0))
+            
+            step += 1
 
-        # checking the stopping condition
-        if step < 3:
-            continue
-        
-        if np.abs(adm_cost[-3] - adm_cost[-1]) < 0.04:
-            best_perf["opt_params"] = thetas_arr[-3]
-            best_perf["avg_loss"] = adm_cost[-3]
-            best_perf["auroc"] = adm_auroc[-3]
-            break
+            # require min 1 epoch
+            # if step < len(config["events"]):
+            #     continue
+            # elif len(adm_cost) < 20:
+            #     continue
+            if step < 40:
+                continue
+            
+            if np.std(adm_cost[-20:]) < 0.05:
+                best_index = find_best_index(adm_cost)
+
+                best_perf["opt_params"] = thetas_arr[best_index]
+                best_perf["avg_loss"] = adm_cost[best_index]
+                best_perf["auroc"] = adm_auroc[best_index]
+
+                best_perfs.append(copy.deepcopy(best_perf))
+                break
+
+    def find_best_index(cost_arr):
+        index = 0
+        for i in range(len(cost_arr)):
+            if np.std(cost_arr[i:i+5]) < 0.05:
+                index = i
+                break
+        return index
+
+
 
 
     # Saving outputs
@@ -169,6 +189,7 @@ def train(config):
     if not os.path.exists(destdir):
         os.makedirs(destdir)
 
+    # Saving the params, costs, and aurocs computed for each of the 20 trials
     destdir_thetas = os.path.join(destdir, "opt_thetas")
     if not os.path.exists(destdir_thetas):
         os.makedirs(destdir_thetas)
@@ -177,7 +198,26 @@ def train(config):
         "%02d_%03dga_best%.e_data_theta"
         % (config["ix"], config["gen"], config["batch_size"]),
     )
-    np.save(filepath_thetas, best_perf["opt_params"])
+    np.save(filepath_thetas, [i["opt_params"] for i in best_perfs])
+    destdir_costs = os.path.join(destdir, "costs")
+    if not os.path.exists(destdir_costs):
+        os.makedirs(destdir_costs)
+    filepath_costs = os.path.join(
+        destdir_costs,
+        "%02d_%03dga_best%.e_data_costs"
+        % (config["ix"], config["gen"], config["batch_size"]),
+    )
+    np.save(filepath_costs, [i["avg_loss"] for i in best_perfs])
+    destdir_aurocs = os.path.join(destdir, "aurocs")
+    if not os.path.exists(destdir_aurocs):
+        os.makedirs(destdir_aurocs)
+    filepath_aurocs = os.path.join(
+        destdir_aurocs,
+        "%02d_%03dga_best%.e_data_aurocs"
+        % (config["ix"], config["gen"], config["batch_size"]),
+    )
+    np.save(filepath_aurocs, [i["auroc"] for i in best_perfs])
+    
 
     destdir_ansatz = os.path.join(destdir, "opt_ansatz")
     if not os.path.exists(destdir_ansatz):
@@ -269,12 +309,22 @@ def train(config):
     plt.savefig(filepath_combine, format="png")
     plt.close()
 
+    # return {
+    #     "fitness_metric": 1 - best_perf["avg_loss"],
+    #     "eval_metrics": {
+    #         "auroc": best_perf["auroc"],
+    #     },
+    # }
     return {
-        "fitness_metric": 1 - best_perf["avg_loss"],
-        "eval_metrics": {
-            "auroc": best_perf["auroc"],
+        "fitness_metrics": {
+            "avg fitness": np.mean([1 - i["avg_loss"] for i in best_perfs]),
+            "stddev fitness": np.std([1 - i["avg_loss"] for i in best_perfs]),
         },
-    }
+        "eval_metrics": {
+            "avg auroc": np.mean([i["auroc"] for i in best_perfs]),
+            "stddev auroc": np.std([i["auroc"] for i in best_perfs]),
+        },
+    } # FIX GA TO ACCEPT ARRAYS OF RETURN VALUES TO GET STATISTICS
 
 
 def compute_auroc(thetas, config, FINAL=False):
