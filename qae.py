@@ -160,8 +160,8 @@ def train(config):
             thetas = thetas - (10**step_size_factor * np.sum(grads, axis=0))
             adm_cost.append(np.mean(costs, axis=0))
             
-            if step%10 == 0:
-                print(step)
+            # if step%10 == 0:
+            #     print(step)
                 # print(adm_cost)
             step += 1
 
