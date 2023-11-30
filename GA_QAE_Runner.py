@@ -15,35 +15,42 @@ import ga_vqc as gav
 from qae import main as qae_main
     
 def compare_fitness(fitness_A, fitness_B):
-    if fitness_A["avg fitness"] > fitness_B["avg fitness"]:
+    if fitness_A["avg_fitness"] > fitness_B["avg_fitness"]:
         return 1
     else:
         return 0
 
 def choose_best(best_arr, fitness_arr):
-    return_best_ix_set = set([i for i in best_arr])
+    return_best_ix_set = set([i for i in range(len(best_arr))])
     return_fitness_ix_set = set()
     for i in range(len(fitness_arr)):
         add_flag = True
         for j in range(len(best_arr)):
-            if not math.isclose(best_arr[j]["avg fitness"], fitness_arr[i]["avg fitness"], 
-                    rel_tol=(best_arr[j]["stddev fitness"] + 
-                    fitness_arr[i]["stddev fitness"])):
+            if j not in return_best_ix_set:
+                continue
+            if not math.isclose(best_arr[j]["avg_fitness"], fitness_arr[i]["avg_fitness"], 
+                    rel_tol=(best_arr[j]["stddev_fitness"] + 
+                    fitness_arr[i]["stddev_fitness"])):
                 
-                if fitness_arr[i]["avg fitness"] > best_arr[j]["avg fitness"]:
+                if fitness_arr[i]["avg_fitness"] > best_arr[j]["avg_fitness"]:
                     return_best_ix_set.remove(j)
                     return_fitness_ix_set.add(i)
                 else:
                     add_flag = False
                     break
-        for j in list(return_fitness_ix_set):
-            if not math.isclose(fitness_arr[j]["avg fitness"], fitness_arr[i]["avg fitness"], 
-                    rel_tol=(fitness_arr[j]["stddev fitness"] + 
-                    fitness_arr[i]["stddev fitness"])):
+        # Check if need to double loop over this ?
+        return_fitness_ix_list = list(return_fitness_ix_set)
+        for j in return_fitness_ix_list:
+            if j not in return_fitness_ix_set or j == i:
+                continue
+            if not math.isclose(fitness_arr[j]["avg_fitness"], fitness_arr[i]["avg_fitness"], 
+                    rel_tol=(fitness_arr[j]["stddev_fitness"] + 
+                    fitness_arr[i]["stddev_fitness"])):
                 
-                if fitness_arr[i]["avg fitness"] > fitness_arr[j]["avg fitness"]:
+                if fitness_arr[i]["avg_fitness"] > fitness_arr[j]["avg_fitness"]:
                     return_fitness_ix_set.remove(j)
                     return_fitness_ix_set.add(i)
+                    return_fitness_ix_list.append(i)
                 else:
                     add_flag = False
                     break
@@ -93,6 +100,8 @@ def main(rng_seed):
         "n_trash_qubits": 2,
         "n_latent_qubits": 1,
         "n_shots": 100,  # ~1000
+        "n_retrains": 1,
+        "n_epochs": 0.028,
         "events": events,
         "batch_size": 8,  # powers of 2, between 1 to 32
         "GPU": False,
@@ -103,8 +112,14 @@ def main(rng_seed):
 
     ga_output_path = os.path.dirname(os.path.realpath(__file__))
     baseline_circuit_data = {
-        "fitness_metrics": 0,
-        "eval_metrics": {"auroc": 0}
+       "fitness_metrics": {
+            "avg_fitness": 0,
+            "stddev_fitness": 0,
+        },
+        "eval_metrics": {
+            "avg_auroc": 0,
+            "stddev_auroc": 0,
+        },
     }
 
     config = gav.Config(qae_main, vqc_config, genepool, ga_output_path, baseline_circuit_data)

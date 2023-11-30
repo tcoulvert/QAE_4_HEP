@@ -122,7 +122,7 @@ def train(config):
     
     rng = np.random.default_rng(seed=config["rng_seed"])
     best_perfs = []
-    for _ in range(20):
+    for _ in range(config["n_retrains"]):
         adm_cost = []
         adm_auroc = []
         opt = qml.AdamOptimizer(0.01, beta1=0.9, beta2=0.999)
@@ -160,17 +160,19 @@ def train(config):
             thetas = thetas - (10**step_size_factor * np.sum(grads, axis=0))
             adm_cost.append(np.mean(costs, axis=0))
             
+            if step%10 == 0:
+                print(step)
+                print(adm_cost)
             step += 1
 
             # require min 1 epoch
-            # if step < len(config["events"]):
-            #     continue
-            # elif len(adm_cost) < 20:
-            #     continue
-            if step < 40:
+            min_steps = np.min([20, len(config["events"])])
+            if (step / len(config["events"])) < config["n_epochs"]:
+                continue
+            elif step < min_steps:
                 continue
             
-            if np.std(adm_cost[-20:]) < 0.05:
+            if np.std(adm_cost[-min_steps:]) < 0.2:
                 best_index = find_best_index(adm_cost)
 
                 best_perf["opt_params"] = thetas_arr[best_index]
@@ -317,12 +319,12 @@ def train(config):
     # }
     return {
         "fitness_metrics": {
-            "avg fitness": np.mean([1 - i["avg_loss"] for i in best_perfs]),
-            "stddev fitness": np.std([1 - i["avg_loss"] for i in best_perfs]),
+            "avg_fitness": np.mean([1 - i["avg_loss"] for i in best_perfs]),
+            "stddev_fitness": np.std([1 - i["avg_loss"] for i in best_perfs]),
         },
         "eval_metrics": {
-            "avg auroc": np.mean([i["auroc"] for i in best_perfs]),
-            "stddev auroc": np.std([i["auroc"] for i in best_perfs]),
+            "avg_auroc": np.mean([i["auroc"] for i in best_perfs]),
+            "stddev_auroc": np.std([i["auroc"] for i in best_perfs]),
         },
     } # FIX GA TO ACCEPT ARRAYS OF RETURN VALUES TO GET STATISTICS
 
