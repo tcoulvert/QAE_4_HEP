@@ -101,7 +101,7 @@ def main(rng_seed):
         "n_latent_qubits": 1,
         "n_shots": 100,  # ~1000
         "n_retrains": 1,
-        "n_epochs": 0.028,
+        "n_epochs": 0.01,
         "events": events,
         "batch_size": 8,  # powers of 2, between 1 to 32
         "GPU": False,

@@ -162,7 +162,7 @@ def train(config):
             
             if step%10 == 0:
                 print(step)
-                print(adm_cost)
+                # print(adm_cost)
             step += 1
 
             # require min 1 epoch
@@ -172,7 +172,7 @@ def train(config):
             elif step < min_steps:
                 continue
             
-            if np.std(adm_cost[-min_steps:]) < 0.2:
+            if np.std(adm_cost[-min_steps:]) < 0.1:
                 best_index = find_best_index(adm_cost)
 
                 best_perf["opt_params"] = thetas_arr[best_index]
@@ -342,7 +342,8 @@ def compute_auroc(thetas, config, FINAL=False):
 
     if FINAL:
         fpr, tpr, thresholds = roc_curve(config["truth_val"], fid_pred)
-        bkg_rejec = 1 - fpr
+        # bkg_rejec = 1 - fpr
+        bkg_rejec = fpr
 
         fid_split = [None, None]
         bkg_cost, sig_cost = [], []
