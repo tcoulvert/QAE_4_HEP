@@ -195,30 +195,32 @@ def train(config):
     destdir_thetas = os.path.join(destdir, "opt_thetas")
     if not os.path.exists(destdir_thetas):
         os.makedirs(destdir_thetas)
-    filepath_thetas = os.path.join(
+    filepath_thetas_arr = [os.path.join(
         destdir_thetas,
-        "%02d_%03dga_best%.e_data_theta"
-        % (config["ix"], config["gen"], config["batch_size"]),
-    )
-    np.save(filepath_thetas, [i["opt_params"] for i in best_perfs])
+        "%02d_%03d_%02d_ga_best%.e_data_theta"
+        % (config["ix"], config["gen"], i, config["batch_size"]),
+    ) for i in range(config["n_retrains"])]
+    np.save(filepath_thetas_arr, [i["opt_params"] for i in best_perfs])
+    
     destdir_costs = os.path.join(destdir, "costs")
     if not os.path.exists(destdir_costs):
         os.makedirs(destdir_costs)
-    filepath_costs = os.path.join(
+    filepath_costs_arr = [os.path.join(
         destdir_costs,
-        "%02d_%03dga_best%.e_data_costs"
-        % (config["ix"], config["gen"], config["batch_size"]),
-    )
-    np.save(filepath_costs, [i["avg_loss"] for i in best_perfs])
+        "%02d_%03d_%02d_ga_best%.e_data_costs"
+        % (config["ix"], config["gen"], i, config["batch_size"]),
+    ) for i in range(config["n_retrains"])]
+    np.save(filepath_costs_arr, [i["avg_loss"] for i in best_perfs])
+    
     destdir_aurocs = os.path.join(destdir, "aurocs")
     if not os.path.exists(destdir_aurocs):
         os.makedirs(destdir_aurocs)
-    filepath_aurocs = os.path.join(
+    filepath_aurocs_arr = [os.path.join(
         destdir_aurocs,
-        "%02d_%03dga_best%.e_data_aurocs"
-        % (config["ix"], config["gen"], config["batch_size"]),
-    )
-    np.save(filepath_aurocs, [i["auroc"] for i in best_perfs])
+        "%02d_%03d_%02d_ga_best%.e_data_aurocs"
+        % (config["ix"], config["gen"], i, config["batch_size"]),
+    ) for i in range(config["n_retrains"])]
+    np.save(filepath_aurocs_arr, [i["auroc"] for i in best_perfs])
     
 
     destdir_ansatz = os.path.join(destdir, "opt_ansatz")
