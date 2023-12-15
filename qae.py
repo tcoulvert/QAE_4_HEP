@@ -2,8 +2,9 @@ import contextlib
 import copy
 import os
 import time
-import matplotlib.pyplot as plt
+import math
 
+import matplotlib.pyplot as plt
 import pennylane as qml
 from pennylane import numpy as np
 from pickle import dump
@@ -101,15 +102,40 @@ def circuit(params, event=None, config=None):
     # qml.operation.Tensor(qml.PauliZ...) for measuring multiple anscillary wires
     return qml.expval(qml.PauliZ(wires=config["n_wires"] - 1))
 
-def square_loss(fidelities):
-    loss = (1 - fidelities)**2
+def var_circuit(params, event=None, config=None):
+    # Embed the data into the circuit
+    qml.broadcast(
+        qml.RX,
+        wires=range(config["n_latent_qubits"] + config["n_trash_qubits"]),
+        pattern="single",
+        parameters=event,
+    )
+    qml.Hadamard(wires=config["n_wires"] - 1)
+
+    # Run the actual circuit ansatz
+    for m in config["qml"]:
+        exec(m)
+
+    # Perform the SWAP-Test for a qubit fidelity measurement
+    qml.broadcast(
+        qml.CSWAP,
+        wires=range(config["n_latent_qubits"], config["n_wires"]),
+        pattern=config["swap_pattern"],
+    )
+    qml.Hadamard(wires=config["n_wires"] - 1)
+
+    # qml.operation.Tensor(qml.PauliZ...) for measuring multiple anscillary wires
+    return qml.var(qml.PauliZ(wires=config["n_wires"] - 1))
+
+def square_loss(fidelity):
+    loss = (1 - fidelity)**2
     
     return loss
 
 def cost(params, event, config):
-    fidelities = config["qnode"](params, event=event, config=config)
+    fidelity = config["qnode"](params, event=event, config=config)
     
-    return square_loss(fidelities)
+    return square_loss(fidelity)
 
 def train(config):
     def find_best_index(cost_arr):
@@ -121,66 +147,92 @@ def train(config):
         return index
     
     rng = np.random.default_rng(seed=config["rng_seed"])
-    best_perfs = []
-    for _ in range(config["n_retrains"]):
-        adm_cost = []
-        adm_auroc = []
-        opt = qml.AdamOptimizer(0.01, beta1=0.9, beta2=0.999)
+    adm_cost = []
+    adm_stddev = []
+    adm_auroc = []
+    opt = qml.AdamOptimizer(0.01, beta1=0.9, beta2=0.999)
 
-        # Initialized to 2 b/c worst performance would be value of 1.
-        best_perf = {
-            "avg_loss": 2.0,
-            "opt_params": None,
-            "auroc": 0.0,
-        }
-        step_size_factor = -1
-        thetas = config["params"]
-        thetas_arr = []
-        step = 0
-        rebatch_step = 0
+    # Initialized to 2 b/c worst performance would be value of 1.
+    best_perf = {
+        "avg_loss": 2.0,
+        "stddev_loss": 0.0,
+        "opt_params": None,
+        "auroc": 0.0,
+    }
+    step_size_factor = -1
+    thetas = config["params"]
+    thetas_arr = []
+    step = 0
+    wait_till_step = 0
+    rebatch_step = 0
 
-        while True:
-            if step == rebatch_step:
-                batched_events, rebatch_step = batch_events(
-                    rng.permutation(config["events"]), config["batch_size"], rng
-                )
+    while True:
+        if step == rebatch_step:
+            batched_events, rebatch_step = batch_events(
+                rng.permutation(config["events"]), config["batch_size"], rng
+            )
 
-            events_batch = batched_events[step - rebatch_step]
-            grads = []
-            costs = []
+        events_batch = batched_events[step - rebatch_step]
+        grads = []
+        costs = []
+        stddevs = []
 
-            # iterating over all the training data
-            for i in range(events_batch.shape[0]):
-                (grad_i, _), cost_i = opt.compute_grad(cost, (thetas, events_batch[i], config), {})
-                grads.append(grad_i)
-                costs.append(cost_i.item())
+        # iterating over all the training data
+        for i in range(events_batch.shape[0]):
+            (grad_i, _), cost_i = opt.compute_grad(cost, (thetas, events_batch[i], config), {})
+            var_i = var_circuit(thetas, events_batch[i], config)
 
-            adm_auroc.append(compute_auroc(thetas, config))
-            thetas_arr.append(copy.deepcopy(thetas))
-            thetas = thetas - (10**step_size_factor * np.sum(grads, axis=0))
-            adm_cost.append(np.mean(costs, axis=0))
-            
-            # if step%10 == 0:
-            #     print(step)
-                # print(adm_cost)
-            step += 1
+            grads.append(grad_i)
+            costs.append(cost_i.item())
+            stddevs.append(var_i.item()**(1/2))
 
-            # require min 1 epoch
-            min_steps = np.min([20, len(config["events"])])
-            if (step / len(config["events"])) < config["n_epochs"]:
-                continue
-            elif step < min_steps:
-                continue
-            
-            if np.std(adm_cost[-min_steps:]) < 0.1:
+        adm_auroc.append(compute_auroc(thetas, config))
+        thetas_arr.append(copy.deepcopy(thetas))
+        thetas = thetas - (10**step_size_factor * np.sum(grads, axis=0))
+        adm_cost.append(np.mean(costs))
+        adm_stddev.append(np.mean(stddevs))
+        
+        # if step%10 == 0:
+        #     print(step)
+            # print(adm_cost)
+        step += 1
+
+        # require some minimum fraction of epochs
+        min_steps = np.min([20, len(config["events"])])
+        if (step / len(config["events"])) < config["n_epochs"]:
+            continue
+        elif step < min_steps:
+            continue
+        elif step < wait_till_step:
+            continue
+
+        # ADD IN DECREASE STEP SIZE BY INCREMENTING DOWN THE STEP_SIZE_FACTOR
+        if math.isclose(np.mean(adm_cost[-min_steps:min_steps/2]), 
+            np.mean(adm_cost[-min_steps/2:]),
+            abs_tol=np.max(adm_stddev[-min_steps:])
+        ):
+            if step_size_factor == -6:
                 best_index = find_best_index(adm_cost)
 
                 best_perf["opt_params"] = thetas_arr[best_index]
                 best_perf["avg_loss"] = adm_cost[best_index]
+                best_perf["stddev_loss"] = adm_stddev[best_index]
                 best_perf["auroc"] = adm_auroc[best_index]
 
-                best_perfs.append(copy.deepcopy(best_perf))
                 break
+            step_size_factor -= 1
+            wait_till_step = step + 20
+
+        
+        if np.std(adm_cost[-min_steps:]) < 0.1:
+            best_index = find_best_index(adm_cost)
+
+            best_perf["opt_params"] = thetas_arr[best_index]
+            best_perf["avg_loss"] = adm_cost[best_index]
+            best_perf["stddev_loss"] = adm_stddev[best_index]
+            best_perf["auroc"] = adm_auroc[best_index]
+
+            break
 
 
 
@@ -195,32 +247,32 @@ def train(config):
     destdir_thetas = os.path.join(destdir, "opt_thetas")
     if not os.path.exists(destdir_thetas):
         os.makedirs(destdir_thetas)
-    filepath_thetas_arr = [os.path.join(
+    filepath_thetas = os.path.join(
         destdir_thetas,
         "%02d_%03d_%02d_ga_best%.e_data_theta"
         % (config["ix"], config["gen"], i, config["batch_size"]),
-    ) for i in range(config["n_retrains"])]
-    np.save(filepath_thetas_arr, [i["opt_params"] for i in best_perfs])
+    )
+    np.save(filepath_thetas, best_perf["opt_params"])
     
-    destdir_costs = os.path.join(destdir, "costs")
-    if not os.path.exists(destdir_costs):
-        os.makedirs(destdir_costs)
-    filepath_costs_arr = [os.path.join(
-        destdir_costs,
-        "%02d_%03d_%02d_ga_best%.e_data_costs"
+    destdir_metas = os.path.join(destdir, "metas")
+    if not os.path.exists(destdir_metas):
+        os.makedirs(destdir_metas)
+    filepath_metas = os.path.join(
+        destdir_metas,
+        "%02d_%03d_%02d_ga_best%.e_data_metas"
         % (config["ix"], config["gen"], i, config["batch_size"]),
-    ) for i in range(config["n_retrains"])]
-    np.save(filepath_costs_arr, [i["avg_loss"] for i in best_perfs])
+    )
+    np.save(filepath_metas, [best_perf["avg_loss"], best_perf["stddev_loss"], best_perf["auroc"]])
     
-    destdir_aurocs = os.path.join(destdir, "aurocs")
-    if not os.path.exists(destdir_aurocs):
-        os.makedirs(destdir_aurocs)
-    filepath_aurocs_arr = [os.path.join(
-        destdir_aurocs,
-        "%02d_%03d_%02d_ga_best%.e_data_aurocs"
-        % (config["ix"], config["gen"], i, config["batch_size"]),
-    ) for i in range(config["n_retrains"])]
-    np.save(filepath_aurocs_arr, [i["auroc"] for i in best_perfs])
+    # destdir_aurocs = os.path.join(destdir, "aurocs")
+    # if not os.path.exists(destdir_aurocs):
+    #     os.makedirs(destdir_aurocs)
+    # filepath_aurocs_arr = [os.path.join(
+    #     destdir_aurocs,
+    #     "%02d_%03d_%02d_ga_best%.e_data_aurocs"
+    #     % (config["ix"], config["gen"], i, config["batch_size"]),
+    # ) for i in range(config["n_retrains"])]
+    # np.save(filepath_auroc, best_perf["auroc"])
     
 
     destdir_ansatz = os.path.join(destdir, "opt_ansatz")
@@ -260,6 +312,7 @@ def train(config):
     )
     plt.figure(0)
     plt.style.use("seaborn")
+    plt.errorbar(adm_cost, yerr=adm_stddev, ls="None")
     plt.plot(adm_cost, "g", label="ADAM Descent - %d data" % config["batch_size"])
     plt.ylabel("Loss (1 - Fid.)")
     plt.xlabel("Optimization steps")
@@ -305,6 +358,7 @@ def train(config):
     fig, ax1 = plt.subplots()
     plt.style.use("seaborn-v0_8-dark")
     ax2 = ax1.twinx()
+    ax1.errorbar(adm_cost, yerr=adm_stddev, ls="None")
     ax1.plot(adm_cost, "g", label="ADAM Descent - %d data" % config["batch_size"])
     ax2.plot(adm_auroc, "b", label="AUROC - %d data" % config["batch_size"])
     ax1.set_xlabel('Optimization steps', color = 'k')
@@ -321,14 +375,13 @@ def train(config):
     # }
     return {
         "fitness_metrics": {
-            "avg_fitness": np.mean([1 - i["avg_loss"] for i in best_perfs]),
-            "stddev_fitness": np.std([1 - i["avg_loss"] for i in best_perfs]),
+            "avg_fitness": best_perf["avg_loss"],
+            "stddev_fitness": best_perf["stddev_loss"],
         },
         "eval_metrics": {
-            "avg_auroc": np.mean([i["auroc"] for i in best_perfs]),
-            "stddev_auroc": np.std([i["auroc"] for i in best_perfs]),
+            "avg_auroc": best_perf["auroc"],
         },
-    } # FIX GA TO ACCEPT ARRAYS OF RETURN VALUES TO GET STATISTICS
+    }
 
 
 def compute_auroc(thetas, config, FINAL=False):

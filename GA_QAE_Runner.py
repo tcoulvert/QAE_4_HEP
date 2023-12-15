@@ -99,9 +99,8 @@ def main(rng_seed):
         "n_wires": 6,  # allows us to use GA to optimize subsets of a circuit
         "n_trash_qubits": 2,
         "n_latent_qubits": 1,
-        "n_shots": 100,  # ~1000
-        "n_retrains": 2,
-        "n_epochs": 0.01,
+        "n_shots": 1000,  # ~1000
+        "n_epochs": 0.0015,
         "events": events,
         "batch_size": 8,  # powers of 2, between 1 to 32
         "GPU": False,
@@ -127,7 +126,7 @@ def main(rng_seed):
     config.pop_size = 4
     config.max_moments = 4
     config.n_steps_patience = 4
-    config.n_eval_metrics = 2
+    config.n_eval_metrics = 1
     config.n_fitness_metrics = 2
     config.compare_fitness = compare_fitness
     config.choose_best = choose_best
