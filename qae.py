@@ -223,18 +223,6 @@ def train(config):
             step_size_factor -= 1
             wait_till_step = step + 20
 
-        
-        if np.std(adm_cost[-min_steps:]) < 0.1:
-            best_index = find_best_index(adm_cost)
-
-            best_perf["opt_params"] = thetas_arr[best_index]
-            best_perf["avg_loss"] = adm_cost[best_index]
-            best_perf["stddev_loss"] = adm_stddev[best_index]
-            best_perf["auroc"] = adm_auroc[best_index]
-
-            break
-
-
 
 
     # Saving outputs
