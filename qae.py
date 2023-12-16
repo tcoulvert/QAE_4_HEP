@@ -30,6 +30,7 @@ def main(config) -> {"fitness_metric": int, "eval_metrics": {}}:
         )
 
     config["qnode"] = qml.QNode(circuit, dev, diff_method="best")
+    config["var_qnode"] = qml.QNode(var_circuit, dev)
 
     config["swap_pattern"] = compute_swap_pattern(
         config["n_ansatz_qubits"],
@@ -137,6 +138,16 @@ def cost(params, event, config):
     
     return square_loss(fidelity)
 
+def stddev_loss(fidelity, var_fidelity):
+    var_loss = 4 * fidelity * var_fidelity
+    
+    return var_loss**(1/2)
+
+def stddev_cost(params, event, config, fidelity):
+    var_fidelity = config["var_qnode"](params, event, config).item()
+    
+    return stddev_loss(fidelity, var_fidelity)
+
 def train(config):
     def find_best_index(cost_arr):
         index = 0
@@ -180,11 +191,11 @@ def train(config):
         # iterating over all the training data
         for i in range(events_batch.shape[0]):
             (grad_i, _), cost_i = opt.compute_grad(cost, (thetas, events_batch[i], config), {})
-            var_i = var_circuit(thetas, events_batch[i], config)
+            stddev_i = stddev_cost(thetas, events_batch[i], config, cost_i)
 
             grads.append(grad_i)
             costs.append(cost_i.item())
-            stddevs.append(var_i.item()**(1/2))
+            stddevs.append(stddev_i)
 
         adm_auroc.append(compute_auroc(thetas, config))
         thetas_arr.append(copy.deepcopy(thetas))
@@ -207,8 +218,8 @@ def train(config):
             continue
 
         # ADD IN DECREASE STEP SIZE BY INCREMENTING DOWN THE STEP_SIZE_FACTOR
-        if math.isclose(np.mean(adm_cost[-min_steps:min_steps/2]), 
-            np.mean(adm_cost[-min_steps/2:]),
+        if math.isclose(np.mean(adm_cost[-min_steps:-(min_steps//2)]), 
+            np.mean(adm_cost[-(min_steps//2):]),
             abs_tol=np.max(adm_stddev[-min_steps:])
         ):
             if step_size_factor == -6:
@@ -217,6 +228,7 @@ def train(config):
                 best_perf["opt_params"] = thetas_arr[best_index]
                 best_perf["avg_loss"] = adm_cost[best_index]
                 best_perf["stddev_loss"] = adm_stddev[best_index]
+                print(adm_stddev[best_index])
                 best_perf["auroc"] = adm_auroc[best_index]
 
                 break
@@ -300,7 +312,7 @@ def train(config):
     )
     plt.figure(0)
     plt.style.use("seaborn")
-    plt.errorbar(adm_cost, yerr=adm_stddev, ls="None")
+    plt.errorbar([i for i in range(len(adm_cost))], adm_cost, yerr=adm_stddev, ls="None")
     plt.plot(adm_cost, "g", label="ADAM Descent - %d data" % config["batch_size"])
     plt.ylabel("Loss (1 - Fid.)")
     plt.xlabel("Optimization steps")
@@ -346,7 +358,7 @@ def train(config):
     fig, ax1 = plt.subplots()
     plt.style.use("seaborn-v0_8-dark")
     ax2 = ax1.twinx()
-    ax1.errorbar(adm_cost, yerr=adm_stddev, ls="None")
+    ax1.errorbar([i for i in range(len(adm_cost))], adm_cost, yerr=adm_stddev, ls="None")
     ax1.plot(adm_cost, "g", label="ADAM Descent - %d data" % config["batch_size"])
     ax2.plot(adm_auroc, "b", label="AUROC - %d data" % config["batch_size"])
     ax1.set_xlabel('Optimization steps', color = 'k')

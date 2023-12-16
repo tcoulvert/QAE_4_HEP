@@ -103,7 +103,7 @@ def main(rng_seed):
         "n_epochs": 0.0015,
         "events": events,
         "batch_size": 8,  # powers of 2, between 1 to 32
-        "GPU": False,
+        "GPU": True,
         "events_val": chosen_val_events,
         "truth_val": chosen_val_class,
         "rng_seed": rng_seed,
@@ -117,13 +117,13 @@ def main(rng_seed):
         },
         "eval_metrics": {
             "avg_auroc": 0,
-            "stddev_auroc": 0,
         },
     }
 
     config = gav.Config(qae_main, vqc_config, genepool, ga_output_path, baseline_circuit_data)
-    config.init_pop_size = 10
-    config.pop_size = 4
+    config.init_pop_size = 1000
+    config.pop_size = 20
+    config.max_concurrent = 20
     config.max_moments = 4
     config.n_steps_patience = 4
     config.n_eval_metrics = 1
