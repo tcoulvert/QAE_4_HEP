@@ -125,7 +125,6 @@ def var_circuit(params, event=None, config=None):
     )
     qml.Hadamard(wires=config["n_wires"] - 1)
 
-    # qml.operation.Tensor(qml.PauliZ...) for measuring multiple anscillary wires
     return qml.var(qml.PauliZ(wires=config["n_wires"] - 1))
 
 def square_loss(fidelity):
@@ -141,10 +140,10 @@ def cost(params, event, config):
 def stddev_loss(fidelity, var_fidelity):
     var_loss = 4 * fidelity * var_fidelity
     
-    return var_loss**(1/2)
+    return var_loss**0.5
 
 def stddev_cost(params, event, config, fidelity):
-    var_fidelity = config["var_qnode"](params, event, config).item()
+    var_fidelity = config["var_qnode"](params, event, config).item() / config["n_shots"]
     
     return stddev_loss(fidelity, var_fidelity)
 
@@ -228,7 +227,8 @@ def train(config):
                 best_perf["opt_params"] = thetas_arr[best_index]
                 best_perf["avg_loss"] = adm_cost[best_index]
                 best_perf["stddev_loss"] = adm_stddev[best_index]
-                print(adm_stddev[best_index])
+                # print(f'best cost: {adm_cost[best_index]:.02f}')
+                # print(f'stddev best cost: {adm_stddev[best_index]:.02f}')
                 best_perf["auroc"] = adm_auroc[best_index]
 
                 break
@@ -375,7 +375,7 @@ def train(config):
     # }
     return {
         "fitness_metrics": {
-            "avg_fitness": best_perf["avg_loss"],
+            "avg_fitness": 1 - best_perf["avg_loss"],
             "stddev_fitness": best_perf["stddev_loss"],
         },
         "eval_metrics": {
