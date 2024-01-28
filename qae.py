@@ -379,7 +379,7 @@ def train(config):
             "stddev_fitness": best_perf["stddev_loss"],
         },
         "eval_metrics": {
-            "avg_auroc": best_perf["auroc"],
+            "auroc": best_perf["auroc"],
         },
     }
 
